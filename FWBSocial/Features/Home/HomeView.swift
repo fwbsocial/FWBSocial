@@ -7,7 +7,7 @@ struct HomeView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                SectionHeader(title: "Home", subtitle: "Announcements land here.", eyebrow: "FWB Social")
+                SectionHeader(title: "Home", subtitle: "Announcements land here.", eyebrow: "fwb social")
                 EmptyStateView(
                     icon: "megaphone",
                     title: "No announcements yet",

@@ -42,7 +42,9 @@ targets:
     info:
       path: FWBSocial/Info.plist
       properties:
-        CFBundleDisplayName: FWB Social
+        # "fwb" is stylistically always lowercase in user-facing text (owner directive 2026-08-10).
+        # Technical identifiers (Swift types, target name, FWB* prefixes) keep standard casing.
+        CFBundleDisplayName: fwb social
         UILaunchScreen: {}
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
