@@ -1,0 +1,69 @@
+name: FWBSocial
+options:
+  bundleIdPrefix: events.fwb
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: "YES"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: NVT8G575R7
+    TARGETED_DEVICE_FAMILY: "1,2"
+
+schemes:
+  FWBSocial:
+    build:
+      targets:
+        FWBSocial: all
+    test:
+      targets:
+        - FWBSocialTests
+
+targets:
+  FWBSocial:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: FWBSocial
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: events.fwb.social
+        PRODUCT_NAME: FWBSocial
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: FWBSocial
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: FWBSocial/Info.plist
+      properties:
+        CFBundleDisplayName: FWB Social
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        ITSAppUsesNonExemptEncryption: false
+
+  FWBSocialTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: FWBSocialTests
+    dependencies:
+      - target: FWBSocial
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: events.fwb.social.tests
+        GENERATE_INFOPLIST_FILE: "YES"

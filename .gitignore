@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Generated project (regenerate with `xcodegen generate`)
+FWBSocial.xcodeproj/
