@@ -246,7 +246,9 @@ final class AuthService {
         if let token = api.accessToken { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         req.timeoutInterval = 30
         let (bytes, response) = try await URLSession.shared.data(for: req)
-        if let http = response as? HTTPURLResponse, http.statusCode == 401 || http.statusCode == 403 {
+        // 401 only — see the note in `APIClient.request`. A 403 from `/me`
+        // would be a real authorization answer, not an expired session.
+        if let http = response as? HTTPURLResponse, http.statusCode == 401 {
             if await refresh() { return try await rawGet(path) }
             throw APIError.unauthorized
         }

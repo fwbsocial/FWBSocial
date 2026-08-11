@@ -1,28 +1,27 @@
 import Foundation
 
-// MARK: - Onboarding endpoints (EULA acceptance + age attestation)
+// MARK: - Onboarding endpoints (EULA acceptance + age gate)
 //
-// ⚠️ CONTRACT STATUS — read before changing anything here.
+// Verified against the deployed fwb-server
+// (Sources/App/Auth/AgeAndAgreements.swift):
 //
-// PLAN.md §2.1 specifies the `fwb_user_agreements` table and §6.1 requires
-// acceptance to be recorded at signup; commissioner decision Q16 requires the
-// Declared Age Range attestation to be reported. fwb-server has the
-// `UserAgreement` model but, as of this build, mounts **no route** for either —
-// `routes.swift` goes straight from `/api/auth/account` to `/api/push`.
+//   GET  /api/onboarding/status      -> OnboardingStatus
+//   POST /api/onboarding/agreements  { docs?, version? }  -> OnboardingStatus
+//   POST /api/onboarding/age         { age_range }        -> OnboardingStatus, or 403
 //
-// So these two paths are the client's proposal, named to match the server's
-// existing `/api/auth/...` convention and its snake_case wire style:
+// All three are authenticated but deliberately NOT vetting-gated: onboarding is
+// how a member becomes vetted, so gating it behind vetting would deadlock.
 //
-//   POST /api/auth/agreements       { doc, version }                    -> 2xx
-//   GET  /api/auth/agreements       { items: [{ doc, version, ... }] }
-//   POST /api/auth/age-attestation  { threshold, meets_threshold, ... }  -> 2xx
+// Two server behaviours the client has to respect rather than work around:
 //
-// Every call degrades gracefully: a 404/405 is reported as
-// `.routeNotDeployed` rather than thrown, so a member is never blocked at the
-// door by a route that has not shipped yet. `OnboardingService` keeps the
-// acceptance locally and replays it on a later launch. When the server side
-// lands, the only thing that may need changing is the three path strings and
-// the two request shapes below.
+//  * **Version conflict is a 409.** The server checks the version the client
+//    displayed against its own current version, so a stale build cannot record
+//    acceptance of text the member never saw. The right response is "update the
+//    app", not a retry.
+//
+//  * **A declared minor is a 403.** `POST /onboarding/age` records the band
+//    first and *then* refuses, so re-running the flow doesn't hand a minor
+//    another go at the dialog. The client must read that 403 as a hard stop.
 
 /// Which of the three hosted documents an acceptance row refers to. Mirrors
 /// fwb-server's `AgreementDoc`.
@@ -32,94 +31,94 @@ enum AgreementDoc: String, Codable, Sendable, CaseIterable {
     case guidelines
 }
 
-/// The outcome of a call that the server may not implement yet.
-enum OnboardingSyncResult: Sendable, Equatable {
-    case recorded
-    case routeNotDeployed
+/// fwb-server's `OnboardingStatusResponse` — the authority on what a member
+/// still owes.
+nonisolated struct OnboardingStatus: Decodable, Sendable {
+    let vettingState: String?
+    let acceptedAll: Bool
+    let missingDocs: [String]
+    /// doc → version currently in force. The client echoes the EULA's version
+    /// back on acceptance so a stale build is rejected rather than silently
+    /// recording the wrong text.
+    let currentVersions: [String: String]?
+    /// `unknown` | `under_13` | `13_to_15` | `16_to_17` | `18_or_over`, or nil
+    /// if never asked. `unknown` is NOT the same as never having asked, and not
+    /// the same as a minor.
+    let declaredAgeRange: String?
+    let ageDeclared: Bool
+    let isDeclaredAdult: Bool
+    /// True when the client should run the Declared Age Range flow — either it
+    /// has never been asked, or the last answer was `unknown`.
+    let ageDeclarationRequired: Bool
 }
 
-nonisolated struct AgreementRecord: Decodable, Sendable {
-    let doc: String
-    let version: String
-    let acceptedAt: Date?
+/// A `POST /onboarding/age` that came back 403: the member declared a band
+/// below 18 and the server has already recorded it.
+struct DeclaredMinorError: LocalizedError {
+    var errorDescription: String? { "You must be 18 or over to use fwb social." }
 }
 
-nonisolated struct AgreementListResponse: Decodable, Sendable {
-    let items: [AgreementRecord]
+/// The hosted text has moved on and this build is showing the old version.
+struct AgreementVersionConflictError: LocalizedError {
+    let reason: String?
+    var errorDescription: String? {
+        reason ?? "The terms have been updated — please update the app and review them again."
+    }
 }
 
 extension APIClient {
 
-    private struct AcceptAgreementBody: Encodable {
-        let doc: String
-        let version: String
+    private struct AcceptAgreementsBody: Encodable {
+        /// Omitted means "all required docs", which is exactly what the
+        /// onboarding screen presents in one step.
+        let docs: [String]?
+        let version: String?
     }
 
-    /// Report a Declared Age Range result.
-    ///
-    /// Deliberately carries the *band*, never a birthdate — that is the entire
-    /// point of the API (PLAN.md §6.3). `lowerBound`/`upperBound` are whatever
-    /// Apple returned for the 18 gate (either may be nil: an open-ended band is
-    /// normal), and `declaration` records how the range was established
-    /// (`self_declared`, `guardian_declared`, `confirmed`, …) so a later audit
-    /// can tell a self-declaration from a verified one.
-    private struct AgeAttestationBody: Encodable {
-        let threshold: Int
-        let meetsThreshold: Bool
-        let lowerBound: Int?
-        let upperBound: Int?
-        let declaration: String?
-        let source: String
+    private struct DeclareAgeBody: Encodable {
+        let ageRange: String
     }
 
-    /// Record acceptance of one hosted document.
-    @discardableResult
-    func acceptAgreement(doc: AgreementDoc, version: String) async throws -> OnboardingSyncResult {
+    /// What the member still owes. `nil` when the route isn't reachable, which
+    /// is deliberately distinct from "owes nothing".
+    func onboardingStatus() async throws -> OnboardingStatus? {
         do {
-            try await postVoid("/api/auth/agreements",
-                               body: AcceptAgreementBody(doc: doc.rawValue, version: version))
-            return .recorded
+            return try await get("/api/onboarding/status")
         } catch let APIError.httpError(code, _) where code == 404 || code == 405 {
-            return .routeNotDeployed
-        }
-    }
-
-    /// What the server already has on file for this member. Returns `nil` when
-    /// the route isn't deployed, which is distinct from "accepted nothing".
-    func fetchAgreements() async throws -> [AgreementRecord]? {
-        do {
-            let response: AgreementListResponse = try await get("/api/auth/agreements")
-            return response.items
-        } catch let APIError.httpError(code, _) where code == 404 || code == 405 {
-            return nil
-        } catch APIError.decodingError {
             return nil
         }
     }
 
-    /// Report the age-range declaration.
+    /// Accept every required document at the version this build displayed.
     @discardableResult
-    func reportAgeAttestation(
-        threshold: Int,
-        meetsThreshold: Bool,
-        lowerBound: Int?,
-        upperBound: Int?,
-        declaration: String?,
-        source: String = "declared_age_range"
-    ) async throws -> OnboardingSyncResult {
+    func acceptAgreements(version: String) async throws -> OnboardingStatus? {
         do {
-            try await postVoid(
-                "/api/auth/age-attestation",
-                body: AgeAttestationBody(
-                    threshold: threshold,
-                    meetsThreshold: meetsThreshold,
-                    lowerBound: lowerBound,
-                    upperBound: upperBound,
-                    declaration: declaration,
-                    source: source))
-            return .recorded
+            return try await post(
+                "/api/onboarding/agreements",
+                body: AcceptAgreementsBody(docs: nil, version: version))
+        } catch let APIError.httpError(code, message) where code == 409 {
+            throw AgreementVersionConflictError(reason: message)
         } catch let APIError.httpError(code, _) where code == 404 || code == 405 {
-            return .routeNotDeployed
+            return nil
+        }
+    }
+
+    /// Report the Declared Age Range band. Throws `DeclaredMinorError` on the
+    /// server's 403 — the band is recorded either way.
+    @discardableResult
+    func declareAgeRange(_ band: DeclaredAgeBand) async throws -> OnboardingStatus? {
+        do {
+            return try await post("/api/onboarding/age", body: DeclareAgeBody(ageRange: band.rawValue))
+        } catch let APIError.httpError(code, _) where code == 403 {
+            throw DeclaredMinorError()
+        } catch APIError.unauthorized {
+            // `APIClient` maps 403 to `.unauthorized` after a failed refresh, so
+            // the minor refusal can surface through this path too. A 403 on this
+            // specific route always means the age refusal — the caller is
+            // authenticated by definition, having just been issued a token.
+            throw DeclaredMinorError()
+        } catch let APIError.httpError(code, _) where code == 404 || code == 405 {
+            return nil
         }
     }
 }

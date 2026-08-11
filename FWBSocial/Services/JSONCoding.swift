@@ -52,27 +52,31 @@ enum FWBDate {
 
 // MARK: - Pagination
 
-/// Standard paged envelope: `{ items: [...], metadata: { page, per, total } }` —
-/// Vapor's `Fluent.Page` shape, which is what `.paginate()` emits.
+/// A page of results, decoded from whichever envelope the route actually uses.
 ///
-/// **Decodes tolerantly on purpose.** A cacheable, unauthenticated collection
-/// route is often written to return a bare JSON array (it ETags better and the
-/// envelope buys nothing when there's no cursor), and `/api/public/announcements`
-/// is exactly that kind of route — PLAN.md §4.1 specifies the caching, not the
-/// envelope. Accepting `{items:…}`, `{data:…}` and `[…]` means a reasonable
-/// server-side choice can't turn into a client outage. A bare array is treated
-/// as a complete, unpaginated page.
+/// **fwb-server's announcements feed is FLAT**: `{ items, total, page, per,
+/// has_more }`, and `AnnouncementDTOs.swift` says why — it is deliberately not
+/// Fluent's `Page`, because that route is the one surface App Review sees signed
+/// out and a hand-rolled shape can't shift underneath it. Fluent's nested
+/// `{ items, metadata: { page, per, total } }` is still accepted, as is a bare
+/// array, so a route that picks a different shape can't become a client outage.
+///
+/// `hasMore` is authoritative when present: it's the server saying so, which
+/// beats inferring the end of the feed from a short page.
 nonisolated struct PagedResponse<T: Decodable & Sendable>: Decodable, Sendable {
     let items: [T]
     let metadata: PageMetadata?
+    let hasMore: Bool?
 
-    init(items: [T], metadata: PageMetadata? = nil) {
+    init(items: [T], metadata: PageMetadata? = nil, hasMore: Bool? = nil) {
         self.items = items
         self.metadata = metadata
+        self.hasMore = hasMore
     }
 
     private enum CodingKeys: String, CodingKey {
         case items, metadata, data, results, meta, pagination
+        case page, per, total, hasMore
     }
 
     init(from decoder: Decoder) throws {
@@ -81,6 +85,7 @@ nonisolated struct PagedResponse<T: Decodable & Sendable>: Decodable, Sendable {
            let array = try? single.decode([T].self) {
             self.items = array
             self.metadata = nil
+            self.hasMore = nil
             return
         }
 
@@ -95,10 +100,21 @@ nonisolated struct PagedResponse<T: Decodable & Sendable>: Decodable, Sendable {
             self.items = []
         }
 
-        self.metadata = (try? container.decodeIfPresent(PageMetadata.self, forKey: .metadata))
+        self.hasMore = try? container.decodeIfPresent(Bool.self, forKey: .hasMore)
+
+        if let nested = (try? container.decodeIfPresent(PageMetadata.self, forKey: .metadata))
             ?? (try? container.decodeIfPresent(PageMetadata.self, forKey: .meta))
-            ?? (try? container.decodeIfPresent(PageMetadata.self, forKey: .pagination))
-            ?? nil
+            ?? (try? container.decodeIfPresent(PageMetadata.self, forKey: .pagination)) {
+            self.metadata = nested
+        } else {
+            // Flat form — the shape fwb-server actually emits.
+            let page = try? container.decodeIfPresent(Int.self, forKey: .page)
+            let per = try? container.decodeIfPresent(Int.self, forKey: .per)
+            let total = try? container.decodeIfPresent(Int.self, forKey: .total)
+            self.metadata = (page ?? per ?? total) == nil
+                ? nil
+                : PageMetadata(page: page ?? nil, per: per ?? nil, total: total ?? nil)
+        }
     }
 }
 

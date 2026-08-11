@@ -63,6 +63,7 @@ struct TermsAcceptanceView: View {
 
     @State private var isWorking = false
     @State private var accepted = false
+    @State private var errorMessage: String?
 
     var body: some View {
         ScrollView {
@@ -111,6 +112,8 @@ struct TermsAcceptanceView: View {
                 .font(Theme.Typography.preview)
                 .tint(Theme.Colors.brand)
 
+                FormErrorText(message: errorMessage)
+
                 Toggle(isOn: $accepted) {
                     Text("I've read and accept the terms, privacy policy and community guidelines.")
                         .font(Theme.Typography.preview)
@@ -140,8 +143,15 @@ struct TermsAcceptanceView: View {
     private func accept() {
         guard let user = auth.user else { return }
         isWorking = true
+        errorMessage = nil
         Task {
-            await onboarding.acceptTerms(for: user)
+            do {
+                try await onboarding.acceptTerms(for: user)
+            } catch {
+                // A 409 means the hosted text moved on and this build is showing
+                // the old version — an "update the app" problem, not a retry.
+                errorMessage = error.localizedDescription
+            }
             isWorking = false
         }
     }
@@ -211,14 +221,18 @@ struct AgeGateView: View {
         Task {
             let outcome: AgeGateOutcome
             do {
-                let response = try await requestAgeRange(ageGates: FWBConfig.minimumAge)
+                // Three thresholds, so Apple's answer maps onto the server's
+                // bands (under_13 / 13_to_15 / 16_to_17 / 18_or_over) exactly
+                // instead of forcing the client to invent one.
+                let gates = AgeGateService.gates
+                let response = try await requestAgeRange(ageGates: gates.0, gates.1, gates.2)
                 outcome = AgeGateService.evaluate(response)
             } catch {
                 outcome = AgeGateService.evaluate(error: error)
             }
             let proceeded = await onboarding.applyAgeGate(outcome, for: user)
-            if !proceeded, case .unavailable(let message) = outcome {
-                errorMessage = message
+            if !proceeded, onboarding.ageGateBlock == nil {
+                errorMessage = "We couldn't record that — check your connection and try again."
             }
             isWorking = false
         }

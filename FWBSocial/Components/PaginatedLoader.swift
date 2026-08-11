@@ -45,8 +45,18 @@ final class PaginatedLoader<Item: Decodable & Sendable & Identifiable> {
             let response = try await fetch(page, per)
             items.append(contentsOf: response.items)
             total = response.metadata?.total
-            if response.items.count < per { reachedEnd = true } else { page += 1 }
-            if let total, items.count >= total { reachedEnd = true }
+
+            // `has_more` is the server saying so, which beats every inference —
+            // fwb-server's feed envelope carries it (AnnouncementDTOs.swift).
+            // The short-page and total heuristics stay as the fallback for
+            // routes that don't.
+            if let hasMore = response.hasMore {
+                reachedEnd = !hasMore
+                if hasMore { page += 1 }
+            } else {
+                if response.items.count < per { reachedEnd = true } else { page += 1 }
+                if let total, items.count >= total { reachedEnd = true }
+            }
         } catch {
             self.error = error.localizedDescription
         }

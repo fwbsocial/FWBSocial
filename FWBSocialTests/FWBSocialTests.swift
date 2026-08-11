@@ -145,6 +145,24 @@ struct PagedResponseTests {
         #expect(page.metadata?.total == 1)
     }
 
+    /// The shape fwb-server actually emits: flat metadata plus `has_more`,
+    /// deliberately not Fluent's nested `Page` (AnnouncementDTOs.swift explains
+    /// why — this is the surface App Review sees signed out).
+    @Test("Decodes fwb-server's flat { items, total, page, per, has_more }")
+    func decodesFlatEnvelope() throws {
+        let json = """
+        { "items": [{ "id": "a", "title": "One" }],
+          "total": 3, "page": 1, "per": 20, "has_more": true }
+        """
+        let page = try FWBJSON.decoder.decode(PagedResponse<Announcement>.self, from: Data(json.utf8))
+        #expect(page.items.count == 1)
+        #expect(page.metadata?.total == 3)
+        #expect(page.metadata?.per == 20)
+        // `has_more` is the server saying so, which beats inferring the end of
+        // the feed from a short page.
+        #expect(page.hasMore == true)
+    }
+
     /// A cacheable public collection route is often written to return a bare
     /// array. Accepting it means a reasonable server-side choice can't become a
     /// client outage.
@@ -182,7 +200,9 @@ struct AnnouncementTests {
           "is_pinned": true,
           "published_at": "2026-08-01T19:00:00Z",
           "created_at": "2026-07-31T19:00:00Z",
-          "author": { "id": "abc", "display_name": "Commissioner", "avatar_url": null }
+          "author_name": "Commissioner",
+          "hero_url": null,
+          "is_read": false
         }
         """
         let announcement = try FWBJSON.decoder.decode(Announcement.self, from: Data(json.utf8))
@@ -208,11 +228,29 @@ struct AnnouncementTests {
         #expect(announcement.isPublished)
     }
 
-    @Test("A flat author_display_name is read too")
-    func decodesFlatAuthor() throws {
-        let json = #"{ "id": "x", "author_display_name": "Someone" }"#
-        let announcement = try FWBJSON.decoder.decode(Announcement.self, from: Data(json.utf8))
-        #expect(announcement.authorName == "Someone")
+    /// `is_read` is nil for a signed-out caller, where read state is meaningless.
+    /// nil is "no account"; `false` is "unread". Drawing an unread dot for a
+    /// signed-out reader would be noise.
+    @Test("A signed-out row has no read state and no unread dot")
+    func signedOutRowHasNoReadState() throws {
+        let announcement = try FWBJSON.decoder.decode(
+            Announcement.self, from: Data(#"{ "id": "x", "title": "T", "body": "B" }"#.utf8))
+        #expect(announcement.isRead == nil)
+        #expect(announcement.isUnread == false)
+    }
+
+    @Test("Publish reports what the push actually did")
+    func decodesPublishResult() throws {
+        let json = """
+        { "announcement": { "id": "x", "title": "T", "body": "B", "status": "published" },
+          "push_delivered": 0,
+          "push_skipped_already_sent": false }
+        """
+        let result = try FWBJSON.decoder.decode(PublishResult.self, from: Data(json.utf8))
+        // Zero is a normal, reportable outcome — not a failure to hide.
+        #expect(result.pushDelivered == 0)
+        #expect(result.pushSkippedAlreadySent == false)
+        #expect(result.announcement.isPublished)
     }
 }
 
@@ -236,19 +274,41 @@ struct AgeGateTests {
         }
     }
 
-    @Test("The unavailable attestation records that the gate did not run")
-    func unavailableAttestationIsHonest() {
-        let attestation = AgeGateService.unavailableAttestation()
-        #expect(attestation.source == "unavailable")
-        // The whole point: these accounts are findable later precisely because
-        // the attestation does NOT claim the threshold was met.
-        #expect(attestation.meetsThreshold == false)
-        #expect(attestation.threshold == FWBConfig.minimumAge)
-        #expect(attestation.lowerBound == nil)
+    @Test("An unavailable gate reports 'unknown', which is not an adult")
+    func unavailableReportsUnknown() {
+        struct Boom: Error {}
+        let outcome = AgeGateService.evaluate(error: Boom())
+        // Reported rather than skipped, precisely so these accounts are
+        // findable — `unknown` never satisfies is_declared_adult server-side.
+        #expect(outcome.reportableBand == .unknown)
+        #expect(outcome.reportableBand?.isAdult == false)
     }
 
     @Test("The gate asks about 18")
     func thresholdIsEighteen() {
         #expect(FWBConfig.minimumAge == 18)
+    }
+
+    /// Three gates (13/16/18) so Apple's answer lands on the server's bands
+    /// exactly, with no band left for the client to invent.
+    @Test("Bounds map onto the server's bands")
+    func bandMapping() {
+        #expect(AgeGateService.band(lower: 18, upper: nil) == .eighteenOrOver)
+        #expect(AgeGateService.band(lower: 16, upper: 17) == .sixteenToSeventeen)
+        #expect(AgeGateService.band(lower: 13, upper: 15) == .thirteenToFifteen)
+        // Open below the lowest gate: no lower bound at all.
+        #expect(AgeGateService.band(lower: nil, upper: 12) == .under13)
+        #expect(AgeGateService.band(lower: nil, upper: nil) == .unknown)
+    }
+
+    @Test("Only 18_or_over is an adult; unknown is neither adult nor minor")
+    func bandSemantics() {
+        #expect(DeclaredAgeBand.eighteenOrOver.isAdult)
+        #expect(DeclaredAgeBand.sixteenToSeventeen.isMinor)
+        // The distinction the server relies on: `unknown` never satisfies
+        // is_declared_adult, so those accounts stay findable and re-gateable —
+        // but it is not a positive minor attestation either.
+        #expect(DeclaredAgeBand.unknown.isAdult == false)
+        #expect(DeclaredAgeBand.unknown.isMinor == false)
     }
 }

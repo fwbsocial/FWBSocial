@@ -2,23 +2,26 @@ import Foundation
 
 // MARK: - Announcement
 //
-// PLAN.md §2.2 / §4.1. Modeled against the plan's `fwb_announcements` columns
-// rather than a deployed response, because the server side is being built in
-// parallel — so every field except `id` is Optional and the view layer degrades
-// instead of failing. A required field that turns out to be absent takes the
-// whole feed down; an Optional one costs a `??`.
+// A mirror of fwb-server's `AnnouncementResponse`
+// (Sources/App/Modules/Announcements/AnnouncementDTOs.swift), verified against
+// the deployed route rather than inferred from the plan.
 //
-// Author shape is accepted in three forms because there are three reasonable
-// ways to serialise it and guessing wrong shouldn't cost a round of integration:
-// a nested `author` object, a flat `author_display_name`, or nothing at all.
+// Optionality is looser here than on the server on purpose. The server declares
+// `title`, `body`, `visibility`, `status` and `isPinned` non-null, and they are
+// — but this client also has to survive a server mid-deploy and a route that
+// gains a field. A required property that turns out to be absent throws
+// `keyNotFound` and takes the entire feed down; an Optional one costs a `??`.
+//
+// `isRead` is nil for signed-out callers, where read state is meaningless. That
+// distinction matters: nil is "no account", `false` is "unread".
 
 nonisolated struct Announcement: Decodable, Sendable, Identifiable, Equatable {
     let id: String
     let title: String?
     let body: String?
 
-    /// `public` | `vetted` (PLAN.md §2.2). `public` rows are the ones the
-    /// signed-out Home tab shows.
+    /// `public` | `vetted` (PLAN.md §2.2). `public` rows are what the signed-out
+    /// Home tab shows.
     let visibility: String?
     /// `draft` | `published`.
     let status: String?
@@ -27,51 +30,82 @@ nonisolated struct Announcement: Decodable, Sendable, Identifiable, Equatable {
     let createdAt: Date?
     let updatedAt: Date?
 
-    /// Read state, present only on the authenticated feed.
-    let readAt: Date?
+    /// Read state — nil when unauthenticated.
+    let isRead: Bool?
 
-    /// Hero media. `heroMediaUrl` is a resolved URL if the server hands one
-    /// back; `heroMediaKey` is the raw R2 key, which is useless to the client on
-    /// its own (R2 is not provisioned — PLAN.md Phase 0) but is kept so the
-    /// field isn't silently dropped.
-    let heroMediaUrl: String?
-    let heroMediaKey: String?
+    /// Resolved hero URL. The write side takes a `hero_media_key`; the read side
+    /// hands back a URL. R2 isn't provisioned yet (PLAN.md Phase 0), so in
+    /// practice this is nil today.
+    let heroUrl: String?
 
-    let author: AnnouncementAuthor?
-    let authorDisplayName: String?
+    let authorName: String?
 
     var displayTitle: String { title?.isEmpty == false ? title! : "Untitled" }
     var displayBody: String { body ?? "" }
     var isPublished: Bool { status == nil || status == "published" }
+    var isDraft: Bool { status == "draft" }
     var pinned: Bool { isPinned ?? false }
-    var isUnread: Bool { readAt == nil }
     var isVettedOnly: Bool { visibility == "vetted" }
 
-    var authorName: String? {
-        author?.displayName ?? authorDisplayName
-    }
+    /// Only meaningful with a session — a signed-out reader has no read state,
+    /// and drawing an unread dot for them would be noise.
+    var isUnread: Bool { isRead == false }
 
     /// The timestamp worth showing: when it was published, falling back to when
     /// it was written.
     var timestamp: Date? { publishedAt ?? createdAt }
 }
 
-nonisolated struct AnnouncementAuthor: Decodable, Sendable, Equatable {
-    let id: String?
-    let displayName: String?
-    let avatarUrl: String?
-}
-
 // MARK: - Admin write payloads
 
-/// Create/update body for `POST|PATCH /api/admin/announcements`.
-///
-/// `nil` means "leave alone" on PATCH, so the composer sends only what changed.
-nonisolated struct AnnouncementDraft: Encodable, Sendable {
+/// `POST /api/admin/announcements` — `CreateAnnouncementRequest`. Title and body
+/// are required; visibility defaults to `public` server-side.
+nonisolated struct CreateAnnouncementRequest: Encodable, Sendable {
+    let title: String
+    let body: String
+    var visibility: String?
+    var heroMediaKey: String?
+    var isPinned: Bool?
+}
+
+/// `PATCH /api/admin/announcements/:id` — `UpdateAnnouncementRequest`. Every
+/// field is Optional and an omitted one is left alone.
+nonisolated struct UpdateAnnouncementRequest: Encodable, Sendable {
     var title: String?
     var body: String?
     var visibility: String?
+    var heroMediaKey: String?
     var isPinned: Bool?
-    /// Included on create so an admin can save a draft without publishing it.
-    var status: String?
+}
+
+/// What `POST /api/admin/announcements/:id/publish` returns.
+///
+/// `pushDelivered` is surfaced in the UI rather than assumed: zero is a normal
+/// outcome (nobody opted in, APNs not configured, everyone toggled it off), and
+/// an admin who is told "published" while nothing was delivered has been
+/// misled. `pushSkippedAlreadySent` is the re-publish guard — `push_sent_at`
+/// stops a second publish double-notifying the membership.
+nonisolated struct PublishResult: Decodable, Sendable {
+    let announcement: Announcement
+    let pushDelivered: Int?
+    let pushSkippedAlreadySent: Bool?
+}
+
+// MARK: - Notification preferences
+//
+// `GET|PUT /api/me/notifications`. A dedicated route rather than a corner of the
+// profile update, which is what the server offers and what the toggles use.
+
+nonisolated struct NotificationPreferences: Codable, Sendable, Equatable {
+    var notifyAnnouncements: Bool
+    var notifyDm: Bool
+    var notifyFriendRequests: Bool
+    var notifyChannelPosts: Bool
+}
+
+nonisolated struct NotificationPreferencesUpdate: Encodable, Sendable {
+    var notifyAnnouncements: Bool?
+    var notifyDm: Bool?
+    var notifyFriendRequests: Bool?
+    var notifyChannelPosts: Bool?
 }

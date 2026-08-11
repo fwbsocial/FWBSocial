@@ -19,7 +19,7 @@ struct AnnouncementRow: View {
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: Theme.Spacing.sm)
-                    if announcement.isUnread && AuthService.shared.isSignedIn {
+                    if announcement.isUnread {
                         Circle()
                             .fill(Theme.Colors.brand)
                             .frame(width: 8, height: 8)
@@ -46,7 +46,7 @@ struct AnnouncementRow: View {
                     if announcement.isVettedOnly {
                         StatusBadge("Members", color: Theme.Colors.caution)
                     }
-                    if announcement.status == "draft" {
+                    if announcement.isDraft {
                         StatusBadge("Draft", color: Theme.Colors.caution)
                     }
                 }

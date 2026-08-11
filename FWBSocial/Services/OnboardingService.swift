@@ -11,20 +11,20 @@ private let onboardingLog = Logger(subsystem: "events.fwb.social", category: "On
 //
 //   1. **Terms acceptance** — the EULA with its zero-tolerance clause, plus the
 //      privacy policy and community guidelines. Guideline 1.2 requires this at
-//      signup, and the record must name a *version*: "did they accept the text
-//      that had the zero-tolerance clause?" is the only question that ever gets
+//      signup, and the record names a *version*: "did they accept the text that
+//      had the zero-tolerance clause?" is the only question that ever gets
 //      asked, and a boolean cannot answer it.
 //
 //   2. **The 18+ age gate** — Apple's Declared Age Range API. A declared minor
 //      or a refusal to share is a hard stop, not a nag.
 //
-// State lives in two places on purpose. The server is authoritative
-// (`fwb_user_agreements`), but its routes are **not deployed yet** — see
-// `OnboardingAPI.swift`. So acceptance is also written to `UserDefaults`, keyed
-// by user id *and* document version, and replayed to the server on every launch
-// until it sticks. The failure mode that matters is a member who accepted the
-// terms being asked again on every cold launch because the server 404s; the
-// local record prevents that without pretending the server has the row.
+// **The server is the authority.** `GET /api/onboarding/status` answers both
+// questions, and this class is mostly a cache of that answer. The one place it
+// overrides the server is the unavailable-gate case: the server records
+// `unknown`, which never satisfies `is_declared_adult`, so it would keep asking
+// forever on a device where the API can't run. A local, per-user note suppresses
+// the re-prompt without pretending the server said adult — the account stays
+// visibly un-gated server-side, which is exactly what an audit needs.
 
 @Observable
 @MainActor
@@ -36,7 +36,7 @@ final class OnboardingService {
     /// waits for it so nobody sees a flash of the EULA they already accepted.
     private(set) var didLoad = false
 
-    /// The member still owes us an acceptance of the current document version.
+    /// The member still owes an acceptance of the current document version.
     private(set) var needsTermsAcceptance = false
 
     /// The age gate has not produced a usable verdict yet.
@@ -45,11 +45,13 @@ final class OnboardingService {
     /// Set when the gate said no. The blocking screen reads this.
     private(set) var ageGateBlock: AgeGateOutcome.BlockReason?
 
-    /// True when the server has no route for these records yet, so the app is
-    /// running on local state alone. Surfaced in Settings → About rather than
-    /// hidden, because "the server has no record of this acceptance" is exactly
-    /// the sort of thing that should not be silent.
+    /// True when the server couldn't be reached or has no onboarding routes, so
+    /// the app is running on local state alone. Surfaced in Settings rather than
+    /// hidden — "the server has no record of your acceptance" should not be silent.
     private(set) var isRunningOnLocalRecordOnly = false
+
+    /// The last status the server gave us, for anything that wants the detail.
+    private(set) var status: OnboardingStatus?
 
     /// Nothing left to ask, and nothing blocking.
     var isComplete: Bool { !needsTermsAcceptance && !needsAgeGate && ageGateBlock == nil }
@@ -64,18 +66,16 @@ final class OnboardingService {
 
     // MARK: - Local keys
 
+    /// Local mirror of the acceptance, so a server that is briefly unreachable
+    /// doesn't re-ask a member who already accepted this exact version.
     private func termsKey(_ userId: String) -> String {
         "fwb.onboarding.terms.\(userId).\(FWBConfig.agreementsVersion)"
     }
 
-    private func ageKey(_ userId: String) -> String {
-        "fwb.onboarding.age.\(userId)"
-    }
-
-    /// Set when the attestation itself is recorded locally but has never been
-    /// accepted by the server; drives the replay on the next launch.
-    private func pendingSyncKey(_ userId: String) -> String {
-        "fwb.onboarding.pendingSync.\(userId)"
+    /// Set only when the gate ran and could not answer, and policy let the
+    /// member through. Never set for a pass — a pass is the server's to record.
+    private func ageUnavailableKey(_ userId: String) -> String {
+        "fwb.onboarding.ageUnavailable.\(userId)"
     }
 
     // MARK: - Lifecycle
@@ -86,56 +86,49 @@ final class OnboardingService {
         guard let user else { reset(); return }
         let userId = user.id
 
-        let acceptedLocally = defaults.bool(forKey: termsKey(userId))
-        let agePassedLocally = defaults.bool(forKey: ageKey(userId))
-
-        // Ask the server what it has. `nil` means the route isn't deployed —
-        // which is NOT the same as "accepted nothing", and must not be read as
-        // an unaccepted EULA.
-        var acceptedOnServer: Bool?
         do {
-            if let records = try await api.fetchAgreements() {
+            if let remote = try await api.onboardingStatus() {
+                status = remote
                 isRunningOnLocalRecordOnly = false
-                acceptedOnServer = records.contains {
-                    $0.doc == AgreementDoc.eula.rawValue && $0.version == FWBConfig.agreementsVersion
-                }
-            } else {
-                isRunningOnLocalRecordOnly = true
+                needsTermsAcceptance = !remote.acceptedAll
+                needsAgeGate = remote.ageDeclarationRequired
+                    && !defaults.bool(forKey: ageUnavailableKey(userId))
+                ageGateBlock = nil
+                didLoad = true
+                return
             }
+            // No onboarding routes at all — an older server.
+            isRunningOnLocalRecordOnly = true
         } catch {
-            // Offline or a server error: fall back to the local record rather
-            // than blocking a member who already accepted.
-            onboardingLog.debug("Agreement fetch failed: \(error.localizedDescription)")
+            onboardingLog.debug("Onboarding status fetch failed: \(error.localizedDescription)")
             isRunningOnLocalRecordOnly = true
         }
 
-        needsTermsAcceptance = !(acceptedOnServer ?? acceptedLocally)
-        needsAgeGate = !agePassedLocally
+        // Offline / no routes: fall back to what this device remembers rather
+        // than blocking a member who has already been through this.
+        needsTermsAcceptance = !defaults.bool(forKey: termsKey(userId))
+        needsAgeGate = !defaults.bool(forKey: ageUnavailableKey(userId))
         ageGateBlock = nil
         didLoad = true
-
-        if defaults.bool(forKey: pendingSyncKey(userId)) {
-            await replayPendingSync(userId: userId)
-        }
     }
 
-    /// Clear in-memory state on sign-out. Local acceptance records are keyed by
-    /// user id and deliberately survive — signing out and back in is not a
-    /// reason to re-accept the same version of the same document.
+    /// Clear in-memory state on sign-out. Local records are keyed by user id and
+    /// deliberately survive — signing out and back in is not a reason to
+    /// re-accept the same version of the same document.
     func reset() {
         didLoad = false
         needsTermsAcceptance = false
         needsAgeGate = false
         ageGateBlock = nil
         isRunningOnLocalRecordOnly = false
+        status = nil
     }
 
-    /// Drop every local record for a user. Called on account deletion so a
-    /// re-registration on the same device starts genuinely clean.
+    /// Drop every local record for a user, so a re-registration on this device
+    /// starts genuinely clean.
     func forgetLocalState(for userId: String?) {
         guard let userId else { return }
-        defaults.removeObject(forKey: ageKey(userId))
-        defaults.removeObject(forKey: pendingSyncKey(userId))
+        defaults.removeObject(forKey: ageUnavailableKey(userId))
         // The terms key is version-scoped, so only the current version can be
         // named here. An older version's leftover key is harmless — it can never
         // satisfy the current-version check.
@@ -144,116 +137,101 @@ final class OnboardingService {
 
     // MARK: - Terms
 
-    /// Record acceptance of the EULA, privacy policy and community guidelines.
+    /// Accept the EULA, privacy policy and community guidelines in one step.
     ///
-    /// Local first, deliberately: the member tapped Accept, and their experience
-    /// must not depend on a route that may not exist. The server write follows
-    /// and is retried on the next launch if it doesn't land.
-    func acceptTerms(for user: AuthUser) async {
+    /// The version this build displayed goes on the wire, and the server rejects
+    /// it with a 409 if its own text has moved on — a stale build must not be
+    /// able to record acceptance of text the member never saw. That surfaces as
+    /// an error the member can act on ("update the app"), not a silent retry.
+    func acceptTerms(for user: AuthUser) async throws {
         let userId = user.id
-        defaults.set(true, forKey: termsKey(userId))
-        needsTermsAcceptance = false
-
-        var allRecorded = true
-        for doc in AgreementDoc.allCases {
-            do {
-                let result = try await api.acceptAgreement(doc: doc, version: FWBConfig.agreementsVersion)
-                if result == .routeNotDeployed {
-                    allRecorded = false
-                    isRunningOnLocalRecordOnly = true
-                }
-            } catch {
-                onboardingLog.error("Agreement '\(doc.rawValue)' not recorded: \(error.localizedDescription)")
-                allRecorded = false
+        do {
+            if let remote = try await api.acceptAgreements(version: FWBConfig.agreementsVersion) {
+                status = remote
+                isRunningOnLocalRecordOnly = false
+                needsTermsAcceptance = !remote.acceptedAll
+                needsAgeGate = remote.ageDeclarationRequired
+                    && !defaults.bool(forKey: ageUnavailableKey(userId))
+                defaults.set(true, forKey: termsKey(userId))
+                return
             }
+            // Route missing: record locally so the member isn't asked forever,
+            // and say so in Settings.
+            isRunningOnLocalRecordOnly = true
+            defaults.set(true, forKey: termsKey(userId))
+            needsTermsAcceptance = false
+        } catch is AgreementVersionConflictError {
+            throw AgreementVersionConflictError(reason: nil)
+        } catch {
+            onboardingLog.error("Agreement acceptance failed: \(error.localizedDescription)")
+            throw error
         }
-        defaults.set(!allRecorded, forKey: pendingSyncKey(userId))
     }
 
     // MARK: - Age gate
 
-    /// Apply the gate's verdict. Returns `true` when the member may proceed.
+    /// Apply the gate's verdict, reporting the band to the server.
+    /// Returns `true` when the member may proceed.
     @discardableResult
     func applyAgeGate(_ outcome: AgeGateOutcome, for user: AuthUser) async -> Bool {
         let userId = user.id
 
         switch outcome {
-        case .passed(let attestation):
-            defaults.set(true, forKey: ageKey(userId))
-            needsAgeGate = false
+        case .passed(let band, let declaration):
+            onboardingLog.notice("Age gate passed (\(band.rawValue), \(declaration.rawValue))")
+            let recorded = await report(band)
+            // The server is the authority on adulthood. If it couldn't be told,
+            // don't fabricate a pass — but don't trap the member on the gate
+            // screen over a network blip either; the next launch re-asks.
+            needsAgeGate = !recorded
             ageGateBlock = nil
-            await report(attestation, userId: userId)
-            return true
+            return recorded
 
-        case .blocked(let reason):
-            // Not persisted as a pass, and not persisted as a permanent local
-            // block either — the authority for "this member is a minor" belongs
-            // on the server, and a local flag would be both unenforceable and
-            // trivially cleared by a reinstall.
+        case .blocked(let reason, let band):
+            // Report before blocking: the server records the band and *then*
+            // refuses, so re-running the flow doesn't hand a minor another go at
+            // the dialog. That only works if the band actually reaches it.
+            _ = await report(band)
             ageGateBlock = reason
             needsAgeGate = true
-            await report(
-                AgeGateAttestation(
-                    threshold: FWBConfig.minimumAge,
-                    meetsThreshold: false,
-                    lowerBound: nil,
-                    upperBound: nil,
-                    declaration: .unspecified,
-                    source: reason == .declined ? "declined" : "declared_age_range"),
-                userId: userId)
             return false
 
         case .unavailable(let message):
             onboardingLog.notice("Age gate unavailable: \(message)")
+            // Recorded as `unknown`, which never satisfies `is_declared_adult` —
+            // these accounts stay findable and re-gateable.
+            _ = await report(.unknown)
             guard AgeGatePolicy.allowWhenUnavailable else {
                 ageGateBlock = .declined
                 needsAgeGate = true
                 return false
             }
-            defaults.set(true, forKey: ageKey(userId))
+            defaults.set(true, forKey: ageUnavailableKey(userId))
             needsAgeGate = false
             ageGateBlock = nil
-            await report(AgeGateService.unavailableAttestation(), userId: userId)
             return true
         }
     }
 
-    private func report(_ attestation: AgeGateAttestation, userId: String) async {
+    /// Send the band. Returns whether the server accepted it.
+    private func report(_ band: DeclaredAgeBand) async -> Bool {
         do {
-            let result = try await api.reportAgeAttestation(
-                threshold: attestation.threshold,
-                meetsThreshold: attestation.meetsThreshold,
-                lowerBound: attestation.lowerBound,
-                upperBound: attestation.upperBound,
-                declaration: attestation.declaration.rawValue,
-                source: attestation.source)
-            if result == .routeNotDeployed {
-                isRunningOnLocalRecordOnly = true
-                defaults.set(true, forKey: pendingSyncKey(userId))
+            if let remote = try await api.declareAgeRange(band) {
+                status = remote
+                isRunningOnLocalRecordOnly = false
+                return true
             }
+            // Route missing.
+            isRunningOnLocalRecordOnly = true
+            return true
+        } catch is DeclaredMinorError {
+            // The refusal IS the server accepting the band — it recorded it and
+            // then said no.
+            return false
         } catch {
-            onboardingLog.error("Age attestation not recorded: \(error.localizedDescription)")
-            defaults.set(true, forKey: pendingSyncKey(userId))
+            onboardingLog.error("Age declaration not recorded: \(error.localizedDescription)")
+            isRunningOnLocalRecordOnly = true
+            return false
         }
-    }
-
-    // MARK: - Replay
-
-    /// Re-send whatever the server never accepted. Best effort, silent, and
-    /// idempotent on the server side (one row per user/doc/version).
-    private func replayPendingSync(userId: String) async {
-        guard defaults.bool(forKey: termsKey(userId)) else { return }
-        var stillPending = false
-        for doc in AgreementDoc.allCases {
-            do {
-                if try await api.acceptAgreement(doc: doc, version: FWBConfig.agreementsVersion) == .routeNotDeployed {
-                    stillPending = true
-                }
-            } catch {
-                stillPending = true
-            }
-        }
-        defaults.set(stillPending, forKey: pendingSyncKey(userId))
-        if stillPending { isRunningOnLocalRecordOnly = true }
     }
 }

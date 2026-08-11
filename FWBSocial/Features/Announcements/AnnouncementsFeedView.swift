@@ -76,8 +76,10 @@ struct AnnouncementsFeedView: View {
                         .buttonStyle(.plain)
                         .contextMenu { adminMenu(for: announcement) }
                         .task {
+                            let includeDrafts = auth.isAdmin
                             await loader.loadMoreIfNeeded(current: announcement) { page, per in
-                                try await APIClient.shared.announcementsFeed(page: page, per: per)
+                                try await APIClient.shared.announcementsFeed(
+                                    page: page, per: per, includeDrafts: includeDrafts)
                             }
                         }
                     }
@@ -189,7 +191,13 @@ struct AnnouncementsFeedView: View {
             } label: {
                 Label("Edit", systemImage: "pencil")
             }
-            if !announcement.isPublished {
+            if announcement.isPublished {
+                Button {
+                    unpublish(announcement)
+                } label: {
+                    Label("Move to draft", systemImage: "tray.and.arrow.down")
+                }
+            } else {
                 Button {
                     publish(announcement)
                 } label: {
@@ -207,8 +215,30 @@ struct AnnouncementsFeedView: View {
     private func publish(_ announcement: Announcement) {
         Task {
             do {
-                _ = try await APIClient.shared.publishAnnouncement(id: announcement.id)
-                toasts.success("Published")
+                let result = try await APIClient.shared.publishAnnouncement(id: announcement.id)
+                // Report what the push actually did rather than implying
+                // delivery. Zero recipients is a normal outcome — nobody opted
+                // in, APNs unconfigured, everyone toggled it off — and an admin
+                // told only "published" has been misled.
+                if result.pushSkippedAlreadySent == true {
+                    toasts.success("Published — members were already notified")
+                } else if let delivered = result.pushDelivered {
+                    toasts.success("Published — notified \(delivered) device\(delivered == 1 ? "" : "s")")
+                } else {
+                    toasts.success("Published")
+                }
+                await reload()
+            } catch {
+                toasts.error(error.localizedDescription)
+            }
+        }
+    }
+
+    private func unpublish(_ announcement: Announcement) {
+        Task {
+            do {
+                _ = try await APIClient.shared.unpublishAnnouncement(id: announcement.id)
+                toasts.success("Moved back to draft")
                 await reload()
             } catch {
                 toasts.error(error.localizedDescription)
@@ -230,8 +260,12 @@ struct AnnouncementsFeedView: View {
     }
 
     private func reload() async {
+        // Admins read the admin list, which is the only feed that includes
+        // drafts; everyone else reads the member or public feed.
+        let includeDrafts = auth.isAdmin
         await loader.loadFirst { page, per in
-            try await APIClient.shared.announcementsFeed(page: page, per: per)
+            try await APIClient.shared.announcementsFeed(
+                page: page, per: per, includeDrafts: includeDrafts)
         }
     }
 }

@@ -85,6 +85,10 @@ struct AnnouncementDetailView: View {
         .task {
             announcement = preloaded
             await load()
+            // Fire-and-forget: failing to record a read is not worth
+            // interrupting anyone over, and the row's unread dot corrects itself
+            // on the next refresh either way.
+            await APIClient.shared.markAnnouncementRead(id: announcementId)
         }
     }
 

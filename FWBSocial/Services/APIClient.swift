@@ -110,7 +110,15 @@ final class APIClient {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else { throw APIError.httpError(0, message: nil) }
 
-            if http.statusCode == 401 || http.statusCode == 403 {
+            // **401 only.** The ported source refreshed on 403 too, which is
+            // wrong here and actively harmful: fwb-server uses 403 for real
+            // authorization decisions — `RequireVettedMember`, `RequireAdmin`,
+            // and the age gate's declared-minor refusal. Refreshing can never
+            // fix any of those, and reporting them as `.unauthorized` makes
+            // `AuthService` sign the member out for the crime of tapping an
+            // admin route. A 403 is an answer; it is passed through with its
+            // reason intact.
+            if http.statusCode == 401 {
                 if retryOnUnauth, await AuthService.shared.refresh() {
                     return try await request(method, path, body: body, retryOnUnauth: false)
                 }
@@ -237,7 +245,7 @@ final class APIClient {
         do {
             let (data, response) = try await URLSession.shared.data(for: req)
             guard let http = response as? HTTPURLResponse else { throw APIError.httpError(0, message: nil) }
-            if http.statusCode == 401 || http.statusCode == 403 {
+            if http.statusCode == 401 {
                 if retryOnUnauth, await AuthService.shared.refresh() {
                     return try await upload(path, fileData: fileData, fileName: fileName, mimeType: mimeType,
                                             fieldName: fieldName, fields: fields, retryOnUnauth: false)

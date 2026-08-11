@@ -1,0 +1,618 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		18C0B6CE570EBEDEE214A209 /* FWBSocialTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A557BD4A06ADC97328E8484F /* FWBSocialTests.swift */; };
+		222C495D51F7CB127DEA5D7D /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7D2373A090B010029925B8D /* RootTabView.swift */; };
+		2508EE0D7FFD9B9AA2FE111E /* PushAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = D479307D129E92A86E39826B /* PushAPI.swift */; };
+		3015D35E9876ECCF0C785F0A /* PushCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F946CF1C698F59DEF88F5FA5 /* PushCoordinator.swift */; };
+		308AD94AE6E683AC638378D0 /* JSONCoding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773E99AF015EA6A4EB980F37 /* JSONCoding.swift */; };
+		30A251CA50C4A7577656805B /* FWBComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC5DD9DC99CDDA79F70AA444 /* FWBComponents.swift */; };
+		512C72A914D02FF4B6C76C32 /* EventsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34B71E2BC727CAC93A8328D6 /* EventsView.swift */; };
+		55E26A3A469F7864957975A2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6D94BCE6E2B922663510AC9C /* Assets.xcassets */; };
+		5C66E8AED40000BAF57850B1 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22B5A797EFD09762CDC6ADD /* ProfileView.swift */; };
+		6352E0B9DDD112A37C9C01C0 /* AppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90F90CE64325B0EF717A174C /* AppIconPicker.swift */; };
+		6379131F49238DB5A46B4C84 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7DC169FA9FFFBF5719A67EF /* HomeView.swift */; };
+		6D9260CA0CF3CC6DC4CE9C8C /* AppearanceService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73C862554DF8FF25CE287BBD /* AppearanceService.swift */; };
+		846AD2D60AF8098388F0FC72 /* PaginatedLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE88FED46F5C38A8FA24C3C /* PaginatedLoader.swift */; };
+		8795A9E8AE61CE05C29E83B4 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF3A575FC522433F521E120 /* AppState.swift */; };
+		8A679A033001A9B3A52B6085 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93DA4DB9030A109459A4DE4E /* Theme.swift */; };
+		925BB8D26FC235AFB246DCA0 /* FWBSocial.icon in Resources */ = {isa = PBXBuildFile; fileRef = 50848F09E26540621A223D84 /* FWBSocial.icon */; };
+		9B2FF134C3E2804235B9C92D /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C96235ECD3BFABDD118FC2 /* AuthModels.swift */; };
+		9E79AC085D777F0C27E1FFD1 /* ChannelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DA12C9B8C121B83D83D855A /* ChannelsView.swift */; };
+		A0AD5FBF7799C4C7BC357C96 /* KeychainHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 193510628F07EF7A741AB1BD /* KeychainHelper.swift */; };
+		A8CE52F0D289FCD2E984F192 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2419811F5F6DF567E0F46B81 /* SettingsView.swift */; };
+		AAF9981DF98CCE44AF7EB29F /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EC3A23E47F8493BCB529221 /* APIClient.swift */; };
+		C12B940D9EEB9053CB79942B /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF82D007F30EA207F5D1977 /* AuthService.swift */; };
+		CA3C27B1D70BA3058327182A /* FWBSocialApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A9D9D1E56E126040821D93 /* FWBSocialApp.swift */; };
+		DCBB2494BA168DF34BFC7A40 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499D69216A94C04E9E2BE0C0 /* Config.swift */; };
+		E451EB9152B63235048F2A34 /* ChatListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E043BB502A874BD38C51F1C3 /* ChatListView.swift */; };
+		E62E623FE97A2435D36A832B /* ToastCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD93E1393EDD258E4DBBC843 /* ToastCenter.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		895A2D2B2675E1C43B9D4CDB /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 41B696A1E99E0CE8A18FF9D3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AEDE4715B4F2F7F96FE6D1F4;
+			remoteInfo = FWBSocial;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		07C96235ECD3BFABDD118FC2 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
+		0DA12C9B8C121B83D83D855A /* ChannelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsView.swift; sourceTree = "<group>"; };
+		193510628F07EF7A741AB1BD /* KeychainHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainHelper.swift; sourceTree = "<group>"; };
+		2419811F5F6DF567E0F46B81 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		2EF3A575FC522433F521E120 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		34B71E2BC727CAC93A8328D6 /* EventsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventsView.swift; sourceTree = "<group>"; };
+		3D804FBCF23B9BB5332467F2 /* FWBSocialTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = FWBSocialTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		499D69216A94C04E9E2BE0C0 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		4FF82D007F30EA207F5D1977 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		50848F09E26540621A223D84 /* FWBSocial.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = FWBSocial.icon; sourceTree = "<group>"; };
+		5FE88FED46F5C38A8FA24C3C /* PaginatedLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaginatedLoader.swift; sourceTree = "<group>"; };
+		6D94BCE6E2B922663510AC9C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		73C862554DF8FF25CE287BBD /* AppearanceService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceService.swift; sourceTree = "<group>"; };
+		773E99AF015EA6A4EB980F37 /* JSONCoding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JSONCoding.swift; sourceTree = "<group>"; };
+		90F90CE64325B0EF717A174C /* AppIconPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconPicker.swift; sourceTree = "<group>"; };
+		91A9D9D1E56E126040821D93 /* FWBSocialApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FWBSocialApp.swift; sourceTree = "<group>"; };
+		93DA4DB9030A109459A4DE4E /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		9EC3A23E47F8493BCB529221 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		A557BD4A06ADC97328E8484F /* FWBSocialTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FWBSocialTests.swift; sourceTree = "<group>"; };
+		A5682E99C4CAB4668FE7510B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		B22B5A797EFD09762CDC6ADD /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		B7DC169FA9FFFBF5719A67EF /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		D479307D129E92A86E39826B /* PushAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushAPI.swift; sourceTree = "<group>"; };
+		DD93E1393EDD258E4DBBC843 /* ToastCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastCenter.swift; sourceTree = "<group>"; };
+		E043BB502A874BD38C51F1C3 /* ChatListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatListView.swift; sourceTree = "<group>"; };
+		EC5DD9DC99CDDA79F70AA444 /* FWBComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FWBComponents.swift; sourceTree = "<group>"; };
+		F7D2373A090B010029925B8D /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		F946CF1C698F59DEF88F5FA5 /* PushCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushCoordinator.swift; sourceTree = "<group>"; };
+		FBFB3A206005B3D1CB707E6D /* FWBSocial.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = FWBSocial.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		087C91DFF099CF85595D92C2 /* Events */ = {
+			isa = PBXGroup;
+			children = (
+				34B71E2BC727CAC93A8328D6 /* EventsView.swift */,
+			);
+			path = Events;
+			sourceTree = "<group>";
+		};
+		11F2C94385AF4710BC03AA97 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				93DA4DB9030A109459A4DE4E /* Theme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		1E5F5B0943C1D2CC6122EDDE /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				6D94BCE6E2B922663510AC9C /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		380EF702442227A0344D27D3 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				2EF3A575FC522433F521E120 /* AppState.swift */,
+				91A9D9D1E56E126040821D93 /* FWBSocialApp.swift */,
+				F946CF1C698F59DEF88F5FA5 /* PushCoordinator.swift */,
+				F7D2373A090B010029925B8D /* RootTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		55784DDDAD139948A27C1BB8 /* FWBSocial */ = {
+			isa = PBXGroup;
+			children = (
+				50848F09E26540621A223D84 /* FWBSocial.icon */,
+				A5682E99C4CAB4668FE7510B /* Info.plist */,
+				380EF702442227A0344D27D3 /* App */,
+				E42541549DB352D13A35B0FC /* Components */,
+				8E2D9ECAE7AAC1D9AA3418C2 /* Features */,
+				1E5F5B0943C1D2CC6122EDDE /* Resources */,
+				E3A10272261962F889C5678F /* Services */,
+				11F2C94385AF4710BC03AA97 /* Theme */,
+			);
+			path = FWBSocial;
+			sourceTree = "<group>";
+		};
+		6668C530F47D1850B4F800A3 /* FWBSocialTests */ = {
+			isa = PBXGroup;
+			children = (
+				A557BD4A06ADC97328E8484F /* FWBSocialTests.swift */,
+			);
+			path = FWBSocialTests;
+			sourceTree = "<group>";
+		};
+		872F25F604A6C184C4B4A03A /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				B22B5A797EFD09762CDC6ADD /* ProfileView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		8AD366FF37619B524F61083E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				FBFB3A206005B3D1CB707E6D /* FWBSocial.app */,
+				3D804FBCF23B9BB5332467F2 /* FWBSocialTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		8E2D9ECAE7AAC1D9AA3418C2 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				CA181DB088D8F41CF9AA562C /* Channels */,
+				B22BDBACC3305870E78DE594 /* Chat */,
+				087C91DFF099CF85595D92C2 /* Events */,
+				E85368793D9AF5570D955356 /* Home */,
+				872F25F604A6C184C4B4A03A /* Profile */,
+				FC3452E3B8B1E4A642DD1DC0 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		B22BDBACC3305870E78DE594 /* Chat */ = {
+			isa = PBXGroup;
+			children = (
+				E043BB502A874BD38C51F1C3 /* ChatListView.swift */,
+			);
+			path = Chat;
+			sourceTree = "<group>";
+		};
+		CA181DB088D8F41CF9AA562C /* Channels */ = {
+			isa = PBXGroup;
+			children = (
+				0DA12C9B8C121B83D83D855A /* ChannelsView.swift */,
+			);
+			path = Channels;
+			sourceTree = "<group>";
+		};
+		CA8434EA1A05129D7CFE9B2E = {
+			isa = PBXGroup;
+			children = (
+				55784DDDAD139948A27C1BB8 /* FWBSocial */,
+				6668C530F47D1850B4F800A3 /* FWBSocialTests */,
+				8AD366FF37619B524F61083E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		E3A10272261962F889C5678F /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				9EC3A23E47F8493BCB529221 /* APIClient.swift */,
+				07C96235ECD3BFABDD118FC2 /* AuthModels.swift */,
+				4FF82D007F30EA207F5D1977 /* AuthService.swift */,
+				499D69216A94C04E9E2BE0C0 /* Config.swift */,
+				773E99AF015EA6A4EB980F37 /* JSONCoding.swift */,
+				193510628F07EF7A741AB1BD /* KeychainHelper.swift */,
+				D479307D129E92A86E39826B /* PushAPI.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		E42541549DB352D13A35B0FC /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				EC5DD9DC99CDDA79F70AA444 /* FWBComponents.swift */,
+				5FE88FED46F5C38A8FA24C3C /* PaginatedLoader.swift */,
+				DD93E1393EDD258E4DBBC843 /* ToastCenter.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		E85368793D9AF5570D955356 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				B7DC169FA9FFFBF5719A67EF /* HomeView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		FC3452E3B8B1E4A642DD1DC0 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				73C862554DF8FF25CE287BBD /* AppearanceService.swift */,
+				90F90CE64325B0EF717A174C /* AppIconPicker.swift */,
+				2419811F5F6DF567E0F46B81 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AEDE4715B4F2F7F96FE6D1F4 /* FWBSocial */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0A547FDD7DA1778912243DBF /* Build configuration list for PBXNativeTarget "FWBSocial" */;
+			buildPhases = (
+				BE2F706144F05E5E52816C26 /* Sources */,
+				71BAFAECAA1C17163C6F8157 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FWBSocial;
+			packageProductDependencies = (
+			);
+			productName = FWBSocial;
+			productReference = FBFB3A206005B3D1CB707E6D /* FWBSocial.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C5F23DD02CE8572DC00B8C63 /* FWBSocialTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B7F8CBE049079441A700BC5C /* Build configuration list for PBXNativeTarget "FWBSocialTests" */;
+			buildPhases = (
+				02B89B36154E16CA5D004189 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				AF0BBC420453CAA119D80199 /* PBXTargetDependency */,
+			);
+			name = FWBSocialTests;
+			packageProductDependencies = (
+			);
+			productName = FWBSocialTests;
+			productReference = 3D804FBCF23B9BB5332467F2 /* FWBSocialTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		41B696A1E99E0CE8A18FF9D3 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					AEDE4715B4F2F7F96FE6D1F4 = {
+						DevelopmentTeam = NVT8G575R7;
+						ProvisioningStyle = Automatic;
+					};
+					C5F23DD02CE8572DC00B8C63 = {
+						DevelopmentTeam = NVT8G575R7;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 3B36A48F90D47E0935AC4E7E /* Build configuration list for PBXProject "FWBSocial" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = CA8434EA1A05129D7CFE9B2E;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8AD366FF37619B524F61083E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AEDE4715B4F2F7F96FE6D1F4 /* FWBSocial */,
+				C5F23DD02CE8572DC00B8C63 /* FWBSocialTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		71BAFAECAA1C17163C6F8157 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				55E26A3A469F7864957975A2 /* Assets.xcassets in Resources */,
+				925BB8D26FC235AFB246DCA0 /* FWBSocial.icon in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		02B89B36154E16CA5D004189 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				18C0B6CE570EBEDEE214A209 /* FWBSocialTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BE2F706144F05E5E52816C26 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AAF9981DF98CCE44AF7EB29F /* APIClient.swift in Sources */,
+				6352E0B9DDD112A37C9C01C0 /* AppIconPicker.swift in Sources */,
+				8795A9E8AE61CE05C29E83B4 /* AppState.swift in Sources */,
+				6D9260CA0CF3CC6DC4CE9C8C /* AppearanceService.swift in Sources */,
+				9B2FF134C3E2804235B9C92D /* AuthModels.swift in Sources */,
+				C12B940D9EEB9053CB79942B /* AuthService.swift in Sources */,
+				9E79AC085D777F0C27E1FFD1 /* ChannelsView.swift in Sources */,
+				E451EB9152B63235048F2A34 /* ChatListView.swift in Sources */,
+				DCBB2494BA168DF34BFC7A40 /* Config.swift in Sources */,
+				512C72A914D02FF4B6C76C32 /* EventsView.swift in Sources */,
+				30A251CA50C4A7577656805B /* FWBComponents.swift in Sources */,
+				CA3C27B1D70BA3058327182A /* FWBSocialApp.swift in Sources */,
+				6379131F49238DB5A46B4C84 /* HomeView.swift in Sources */,
+				308AD94AE6E683AC638378D0 /* JSONCoding.swift in Sources */,
+				A0AD5FBF7799C4C7BC357C96 /* KeychainHelper.swift in Sources */,
+				846AD2D60AF8098388F0FC72 /* PaginatedLoader.swift in Sources */,
+				5C66E8AED40000BAF57850B1 /* ProfileView.swift in Sources */,
+				2508EE0D7FFD9B9AA2FE111E /* PushAPI.swift in Sources */,
+				3015D35E9876ECCF0C785F0A /* PushCoordinator.swift in Sources */,
+				222C495D51F7CB127DEA5D7D /* RootTabView.swift in Sources */,
+				A8CE52F0D289FCD2E984F192 /* SettingsView.swift in Sources */,
+				8A679A033001A9B3A52B6085 /* Theme.swift in Sources */,
+				E62E623FE97A2435D36A832B /* ToastCenter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		AF0BBC420453CAA119D80199 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AEDE4715B4F2F7F96FE6D1F4 /* FWBSocial */;
+			targetProxy = 895A2D2B2675E1C43B9D4CDB /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		066879914060C8C2A7A2315F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = FWBSocial;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = FWBSocial/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = events.fwb.social;
+				PRODUCT_NAME = FWBSocial;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		25EE5603689BBF74BCFD1E7F /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = events.fwb.social.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FWBSocial.app/FWBSocial";
+			};
+			name = Debug;
+		};
+		5A09A78DA57417807DEDA723 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = NVT8G575R7;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7609A3CF379F6D18E331C512 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = events.fwb.social.tests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FWBSocial.app/FWBSocial";
+			};
+			name = Release;
+		};
+		CB8573B292ECAD4B662A155C /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = FWBSocial;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
+				INFOPLIST_FILE = FWBSocial/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = events.fwb.social;
+				PRODUCT_NAME = FWBSocial;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E1E09B4BDC0E0F73FA7E000C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = NVT8G575R7;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0A547FDD7DA1778912243DBF /* Build configuration list for PBXNativeTarget "FWBSocial" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				066879914060C8C2A7A2315F /* Debug */,
+				CB8573B292ECAD4B662A155C /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3B36A48F90D47E0935AC4E7E /* Build configuration list for PBXProject "FWBSocial" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E1E09B4BDC0E0F73FA7E000C /* Debug */,
+				5A09A78DA57417807DEDA723 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		B7F8CBE049079441A700BC5C /* Build configuration list for PBXNativeTarget "FWBSocialTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				25EE5603689BBF74BCFD1E7F /* Debug */,
+				7609A3CF379F6D18E331C512 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 41B696A1E99E0CE8A18FF9D3 /* Project object */;
+}

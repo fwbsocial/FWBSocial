@@ -62,12 +62,12 @@ struct AnnouncementComposerView: View {
                     }
                 }
 
-                if isEditing, existing?.isPublished == false {
+                if isEditing, existing?.isDraft == true {
                     Section {
                         Button("Publish now") { showPublishConfirm = true }
                             .disabled(isWorking)
                     } footer: {
-                        Text("Publishing notifies members who have announcement notifications turned on. It only sends once.")
+                        Text("Publishing notifies members who have announcement notifications turned on. It only sends once — re-publishing later won't notify anyone twice.")
                     }
                 }
             }
@@ -112,23 +112,38 @@ struct AnnouncementComposerView: View {
         errorMessage = nil
         Task {
             do {
-                let draft = AnnouncementDraft(
-                    title: title.trimmed,
-                    body: body_.trimmed,
-                    visibility: visibility,
-                    isPinned: isPinned,
-                    status: nil)
-
                 let saved: Announcement
                 if let existing {
-                    saved = try await APIClient.shared.updateAnnouncement(id: existing.id, draft)
+                    saved = try await APIClient.shared.updateAnnouncement(
+                        id: existing.id,
+                        UpdateAnnouncementRequest(
+                            title: title.trimmed,
+                            body: body_.trimmed,
+                            visibility: visibility,
+                            isPinned: isPinned))
                 } else {
-                    saved = try await APIClient.shared.createAnnouncement(draft)
+                    // Created as a draft — the server only pushes on publish, so
+                    // creating and publishing stay two deliberate steps.
+                    saved = try await APIClient.shared.createAnnouncement(
+                        CreateAnnouncementRequest(
+                            title: title.trimmed,
+                            body: body_.trimmed,
+                            visibility: visibility,
+                            isPinned: isPinned))
                 }
+
                 if publish {
-                    _ = try await APIClient.shared.publishAnnouncement(id: saved.id)
+                    let result = try await APIClient.shared.publishAnnouncement(id: saved.id)
+                    if result.pushSkippedAlreadySent == true {
+                        toasts.success("Published — members were already notified")
+                    } else if let delivered = result.pushDelivered {
+                        toasts.success("Published — notified \(delivered) device\(delivered == 1 ? "" : "s")")
+                    } else {
+                        toasts.success("Published")
+                    }
+                } else {
+                    toasts.success("Saved")
                 }
-                toasts.success(publish ? "Published" : "Saved")
                 onSaved()
                 dismiss()
             } catch {

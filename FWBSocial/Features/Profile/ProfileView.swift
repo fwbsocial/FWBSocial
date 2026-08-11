@@ -96,7 +96,7 @@ struct ProfileView: View {
                 }
             }
 
-            NotificationPreferencesSection(user: user)
+            NotificationPreferencesSection()
 
             Section("Avatar") {
                 // R2 is not provisioned yet (PLAN.md Phase 0), so the upload
@@ -187,30 +187,40 @@ struct ProfileView: View {
 
 // MARK: - Notification preferences
 
-/// Announcement pushes are opt-OUT (commissioner Q4): everyone vetted gets them
-/// by default and can turn them off here. The other toggles are wired now
-/// because the profile route already accepts them, even though the features
-/// they gate land later — a preference that silently does nothing is better
-/// than one that silently resets.
+/// Announcement pushes are opt-OUT (commissioner Q4): everyone gets them by
+/// default and can turn them off here.
+///
+/// Reads and writes `GET|PUT /api/me/notifications` — a dedicated route rather
+/// than a corner of the profile update, which is what the server offers. State
+/// is loaded from that route rather than from the cached `/me` user, so a toggle
+/// reflects what the server actually holds and not a stale copy.
 struct NotificationPreferencesSection: View {
-    let user: AuthUser
-
     @Environment(ToastCenter.self) private var toasts
+
+    @State private var prefs: NotificationPreferences?
     @State private var isSaving = false
+    @State private var loadFailed = false
 
     var body: some View {
         Section {
-            toggle("Announcements", value: user.notifyAnnouncements ?? true) {
-                AuthService.ProfileUpdate(notifyAnnouncements: $0)
-            }
-            toggle("Direct messages", value: user.notifyDm ?? true) {
-                AuthService.ProfileUpdate(notifyDm: $0)
-            }
-            toggle("Friend requests", value: user.notifyFriendRequests ?? true) {
-                AuthService.ProfileUpdate(notifyFriendRequests: $0)
-            }
-            toggle("Channel posts", value: user.notifyChannelPosts ?? true) {
-                AuthService.ProfileUpdate(notifyChannelPosts: $0)
+            if let prefs {
+                toggle("Announcements", value: prefs.notifyAnnouncements) {
+                    NotificationPreferencesUpdate(notifyAnnouncements: $0)
+                }
+                toggle("Direct messages", value: prefs.notifyDm) {
+                    NotificationPreferencesUpdate(notifyDm: $0)
+                }
+                toggle("Friend requests", value: prefs.notifyFriendRequests) {
+                    NotificationPreferencesUpdate(notifyFriendRequests: $0)
+                }
+                toggle("Channel posts", value: prefs.notifyChannelPosts) {
+                    NotificationPreferencesUpdate(notifyChannelPosts: $0)
+                }
+            } else if loadFailed {
+                Text("Couldn't load your notification settings.")
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView()
             }
         } header: {
             Text("Notifications")
@@ -218,12 +228,13 @@ struct NotificationPreferencesSection: View {
             Text("You'll only get notifications for features you have access to.")
         }
         .disabled(isSaving)
+        .task { await load() }
     }
 
     private func toggle(
         _ title: String,
         value: Bool,
-        update: @escaping (Bool) -> AuthService.ProfileUpdate
+        update: @escaping (Bool) -> NotificationPreferencesUpdate
     ) -> some View {
         Toggle(title, isOn: Binding(
             get: { value },
@@ -232,13 +243,26 @@ struct NotificationPreferencesSection: View {
         .tint(Theme.Colors.brand)
     }
 
-    private func save(_ update: AuthService.ProfileUpdate) {
+    private func load() async {
+        guard prefs == nil else { return }
+        do {
+            prefs = try await APIClient.shared.notificationPreferences()
+            loadFailed = false
+        } catch {
+            loadFailed = true
+        }
+    }
+
+    private func save(_ update: NotificationPreferencesUpdate) {
         isSaving = true
         Task {
             do {
-                try await AuthService.shared.updateProfile(update)
+                // The response is the server's new state, so the toggles settle
+                // on what actually landed rather than on what was asked for.
+                prefs = try await APIClient.shared.updateNotificationPreferences(update)
             } catch {
                 toasts.error(error.localizedDescription)
+                await load()
             }
             isSaving = false
         }
