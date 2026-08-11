@@ -253,13 +253,13 @@ private struct ClubhouseBackdrop: View {
                 // the 0.74 veil made light Clubhouse indistinguishable from a
                 // flat tint (owner feedback 2026-08-11).
                 (isDark ? Color.black : Color.white)
-                    .opacity(isDark ? 0.42 : 0.20)
+                    .opacity(isDark ? 0.42 : 0.06)
             }
             .overlay {
                 LinearGradient(
                     colors: isDark
                         ? [.black.opacity(0.34), .black.opacity(0.06), .black.opacity(0.40)]
-                        : [.white.opacity(0.26), .white.opacity(0.02), .white.opacity(0.28)],
+                        : [.white.opacity(0.14), .white.opacity(0.0), .white.opacity(0.16)],
                     startPoint: .top,
                     endPoint: .bottom)
             }
