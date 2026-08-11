@@ -114,10 +114,30 @@ final class AppState {
 
     /// The contextual trailing tab-bar action (owner directive 2026-08-11).
     /// Surfaces register on appear and clear on disappear via
-    /// `.floatingAction(...)`; nil = the fifth slot is absent entirely.
+    /// `.floatingAction(...)`; nil = the slot holds its space and draws nothing.
+    ///
+    /// **`owner` is what makes stacking safe.** Once every page registers — a
+    /// channel feed pushed over the channel list, a thread pushed over that —
+    /// two registrars are alive at once, and SwiftUI does not promise that the
+    /// outgoing screen's `onDisappear` runs before the incoming screen's
+    /// `onAppear`. Without an owner token the arriving page's registration is
+    /// erased by the leaving page's cleanup and the slot goes blank mid-push.
+    /// A registrar only ever clears a registration it can prove is its own.
+    /// **`label` is a single word; `voiceOverLabel` is the sentence.**
+    ///
+    /// Owner decisions 2026-08-11, in order: the slot briefly lost `role: .search`
+    /// so a word could render under its glyph, the labels were condensed to fit a
+    /// tab, and then the separated treatment was chosen over the visible text. The
+    /// slot is icon-only again, so `label` is not drawn today — it is kept short
+    /// and correct anyway, as the fallback name and for whatever placement comes
+    /// next, and `voiceOverLabel` is what anyone actually hears.
     struct ContextualAction {
+        let owner: UUID
         let systemImage: String
         let label: String
+        /// Read instead of `label` by VoiceOver when set. "Share code" is not a
+        /// sentence anyone would say; "Share your friend code" is.
+        let voiceOverLabel: String?
         let handler: () -> Void
     }
     var contextualAction: ContextualAction?
