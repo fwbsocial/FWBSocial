@@ -67,6 +67,12 @@ struct RootTabView: View {
         .sheet(isPresented: $appState.isPresentingDevices) {
             NavigationStack { DeviceManagementView() }
         }
+        // A `REPORT_FILED` push lands here. Presented from the tab shell rather
+        // than from Settings so the deep link works from whichever tab was last
+        // open, and so it survives the Settings sheet not being up.
+        .sheet(isPresented: $appState.isPresentingReportQueue) {
+            NavigationStack { ReportQueueView() }
+        }
         // A conversation queued from a push, or from the new-conversation sheet
         // (which cannot push onto the list's own stack from inside itself).
         // Consumed and cleared, so a second drain can't re-navigate.

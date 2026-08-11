@@ -36,6 +36,10 @@ enum PendingPush: Sendable, Equatable {
     /// backstop, not an optimisation: the WebSocket `device_added` frame reaches
     /// only a foregrounded device (§4.3.3).
     case devices
+    /// A member filed a report. Guideline 1.2 commits us to acting within 24
+    /// hours, and this push is what starts that clock for the on-call moderator —
+    /// so it deep-links to the queue rather than to the app.
+    case reportQueue
 }
 
 extension Notification.Name {
@@ -164,6 +168,16 @@ final class PushCoordinator {
     /// an id opens that announcement; one that doesn't still lands on Home.
     /// Chat and channel categories are placeholders until those features exist.
     func route(category: String, userInfo: [String: String] = [:]) {
+        // `type` is the authoritative discriminator on the newer payloads — the
+        // category is the APNs-side label that drives the notification UI, and the
+        // two differ in case by design (`REPORT_FILED` vs `report_filed`). Reading
+        // `type` first means a payload whose category was rewritten (by the NSE, or
+        // by a future notification-content extension) still routes correctly.
+        if userInfo["type"] == "report_filed" {
+            enqueue(.reportQueue)
+            return
+        }
+
         switch category {
         case "fwb_announcement":
             if let id = userInfo["announcement_id"], !id.isEmpty {
@@ -188,6 +202,11 @@ final class PushCoordinator {
             }
         case "DEVICE_APPROVAL":
             enqueue(.devices)
+        // The server's own literal, matching the CHAT_MESSAGE / DEVICE_APPROVAL /
+        // FRIENDING_WINDOW convention. Kept alongside the `type` check above so a
+        // payload carrying only the category still routes.
+        case "REPORT_FILED":
+            enqueue(.reportQueue)
         case "FRIEND_REQUEST", "FRIEND_ACCEPTED":
             enqueue(.profile)
         case "fwb_channel_post":
@@ -226,6 +245,8 @@ final class PushCoordinator {
         case .devices:
             appState.selectedTab = .chat
             appState.isPresentingDevices = true
+        case .reportQueue:
+            appState.openReportQueue()
         }
     }
 }
@@ -292,9 +313,18 @@ final class FWBAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
         // to the string pairs we actually route on BEFORE hopping to the
         // MainActor — carrying the dictionary across would not compile under
         // strict concurrency, and shouldn't.
+        //
+        // Numbers are stringified rather than dropped. APNs delivers JSON numbers
+        // as `NSNumber`, so an `as? String` cast alone silently discarded every
+        // numeric key — `open_report_count` and `oldest_open_hours` on the
+        // report-filed payload are both numbers, and would have vanished before
+        // anything could read them.
         let info: [String: String] = content.userInfo.reduce(into: [:]) { result, pair in
-            if let key = pair.key as? String, let value = pair.value as? String {
-                result[key] = value
+            guard let key = pair.key as? String else { return }
+            switch pair.value {
+            case let value as String: result[key] = value
+            case let value as NSNumber: result[key] = value.stringValue
+            default: break
             }
         }
         Task { @MainActor in

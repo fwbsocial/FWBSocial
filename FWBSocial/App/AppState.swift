@@ -136,7 +136,24 @@ final class AppState {
     /// push exists because the WebSocket frame only reaches a foregrounded app.
     var isPresentingDevices = false
 
+    /// Raised by a `REPORT_FILED` push. The queue also lives in Settings →
+    /// Moderation; this presents it directly rather than routing through Settings,
+    /// because a 24-hour SLA should not begin with two taps of navigation.
+    var isPresentingReportQueue = false
+
     private init() {}
+
+    /// Route to the moderator report queue from a notification tap.
+    ///
+    /// The server only sends `REPORT_FILED` to admins and moderators, so this
+    /// should never fire for anyone else — but a push can outlive the role that
+    /// justified it. A moderator demoted between the send and the tap would
+    /// otherwise be shown a screen whose every request 403s, so the route simply
+    /// does nothing and the app opens normally.
+    func openReportQueue() {
+        guard AuthService.shared.isAdmin || AuthService.shared.isModerator else { return }
+        isPresentingReportQueue = true
+    }
 
     /// Route to an announcement from a notification tap.
     func openAnnouncement(id: String) {
