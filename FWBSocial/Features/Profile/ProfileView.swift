@@ -81,7 +81,25 @@ struct ProfileView: View {
                     LabeledContent("Role", value: "Moderator")
                 }
                 if let code = user.friendCode {
-                    LabeledContent("Friend code", value: code)
+                    // Friend codes are the out-of-band invite path (member
+                    // search is deliberately absent — commissioner decision 9),
+                    // so copying/sharing must be one tap.
+                    HStack {
+                        LabeledContent("Friend code") {
+                            Text(code)
+                                .font(.body.monospaced())
+                                .textSelection(.enabled)
+                        }
+                        ShareLink(item: "Add me on fwb social — friend code: \(code)") {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        UIPasteboard.general.string = code
+                        toasts.show("Friend code copied")
+                    }
                 }
             }
 
