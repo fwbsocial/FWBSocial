@@ -26,6 +26,10 @@ nonisolated struct Announcement: Decodable, Sendable, Identifiable, Equatable {
     /// `draft` | `published`.
     let status: String?
     let isPinned: Bool?
+    /// When the pin is scheduled to lapse, or nil for "pinned until an admin
+    /// unpins it by hand". The server's five-minute sweep is what actually clears
+    /// it; this is only ever what the admin sees on the card.
+    let pinnedUntil: Date?
     let publishedAt: Date?
     let createdAt: Date?
     let updatedAt: Date?
@@ -47,6 +51,19 @@ nonisolated struct Announcement: Decodable, Sendable, Identifiable, Equatable {
     var pinned: Bool { isPinned ?? false }
     var isVettedOnly: Bool { visibility == "vetted" }
 
+    /// "Pinned until Aug 15" — admin-only chrome, because a member has no idea
+    /// what a pin is and no way to change one.
+    var pinScheduleLabel: String? {
+        guard pinned, let pinnedUntil else { return nil }
+        return "Pinned until \(AnnouncementActions.pinDateText(pinnedUntil))"
+    }
+
+    /// What "Share" hands to the share sheet, defined once so the kebab's Share
+    /// and the non-admin toolbar's share are the same thing.
+    var shareText: String {
+        displayBody.isEmpty ? displayTitle : "\(displayTitle)\n\n\(displayBody)"
+    }
+
     /// Only meaningful with a session — a signed-out reader has no read state,
     /// and drawing an unread dot for them would be noise.
     var isUnread: Bool { isRead == false }
@@ -66,6 +83,9 @@ nonisolated struct CreateAnnouncementRequest: Encodable, Sendable {
     var visibility: String?
     var heroMediaKey: String?
     var isPinned: Bool?
+    /// Optional scheduled unpin, only meaningful alongside `isPinned: true` — the
+    /// server clears it on anything that is not pinned.
+    var pinnedUntil: Date?
 }
 
 /// `PATCH /api/admin/announcements/:id` — `UpdateAnnouncementRequest`. Every
@@ -76,6 +96,12 @@ nonisolated struct UpdateAnnouncementRequest: Encodable, Sendable {
     var visibility: String?
     var heroMediaKey: String?
     var isPinned: Bool?
+    /// Set or move the scheduled unpin.
+    var pinnedUntil: Date?
+    /// Remove the schedule while staying pinned. A separate flag because omission
+    /// on this DTO already means "leave alone", so a nil date cannot also mean
+    /// "clear it" — the two are the same bytes on the wire.
+    var clearPinnedUntil: Bool?
 }
 
 /// What `POST /api/admin/announcements/:id/publish` returns.
