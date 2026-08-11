@@ -452,6 +452,11 @@ private struct AppThemeSurface: ViewModifier {
         let canvasScheme: ColorScheme = inverts ? .dark : windowScheme
 
         content
+            // A surface must CLAIM the whole screen before the backdrop paints:
+            // `.background` sizes to the modified view, and a screen whose root
+            // is an intrinsically-sized view (Chat's empty state) otherwise gets
+            // a BAND of painting over black — owner screenshot 2026-08-11.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Lists and forms paint an opaque `systemGroupedBackground` of their
             // own, which covers a backdrop completely. This does NOT cross a
             // `NavigationStack` boundary — applied outside one, the Settings form
