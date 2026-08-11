@@ -130,6 +130,52 @@ nonisolated struct ForumPost: Decodable, Sendable, Identifiable, Equatable {
     let canDelete: Bool?
     let canModerate: Bool?
 
+    /// Photos or video, batched onto BOTH the feed and the detail route so a grid
+    /// renders without a request per post. Signed URLs are good for an hour;
+    /// `APIClient.postMedia(postId:)` refreshes a screen left open longer.
+    ///
+    /// Defaults to empty rather than being Optional: every consumer wants "the
+    /// media, possibly none", and an Optional array would put a `?? []` at each of
+    /// them.
+    let media: [PostMediaDTO]
+
+    // Providing `init(from:)` suppresses the synthesized `CodingKeys`, so it is
+    // declared. Cases carry NO raw values on purpose: the decoder's
+    // `.convertFromSnakeCase` turns `channel_slug` into `channelSlug` and then
+    // matches on the case NAME, so spelling snake_case here would double-convert —
+    // the same trap the DTO comments warn about everywhere else.
+    private enum CodingKeys: String, CodingKey {
+        case id, channelId, channelSlug, title, body, author, isPinned, isLocked
+        case commentCount, reactionCount, myReaction, status, removalReason
+        case lastActivityAt, createdAt, editedAt, canEdit, canDelete, canModerate, media
+    }
+
+    /// `media` is decoded leniently: a server that predates the media contract
+    /// omits the key entirely, and a missing key must not fail the whole post.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        channelId = try c.decodeIfPresent(String.self, forKey: .channelId)
+        channelSlug = try c.decodeIfPresent(String.self, forKey: .channelSlug)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        body = try c.decodeIfPresent(String.self, forKey: .body)
+        author = try c.decodeIfPresent(ForumAuthor.self, forKey: .author)
+        isPinned = try c.decodeIfPresent(Bool.self, forKey: .isPinned)
+        isLocked = try c.decodeIfPresent(Bool.self, forKey: .isLocked)
+        commentCount = try c.decodeIfPresent(Int.self, forKey: .commentCount)
+        reactionCount = try c.decodeIfPresent(Int.self, forKey: .reactionCount)
+        myReaction = try c.decodeIfPresent(String.self, forKey: .myReaction)
+        status = try c.decodeIfPresent(String.self, forKey: .status)
+        removalReason = try c.decodeIfPresent(String.self, forKey: .removalReason)
+        lastActivityAt = try c.decodeIfPresent(Date.self, forKey: .lastActivityAt)
+        createdAt = try c.decodeIfPresent(Date.self, forKey: .createdAt)
+        editedAt = try c.decodeIfPresent(Date.self, forKey: .editedAt)
+        canEdit = try c.decodeIfPresent(Bool.self, forKey: .canEdit)
+        canDelete = try c.decodeIfPresent(Bool.self, forKey: .canDelete)
+        canModerate = try c.decodeIfPresent(Bool.self, forKey: .canModerate)
+        media = (try? c.decodeIfPresent([PostMediaDTO].self, forKey: .media)) as? [PostMediaDTO] ?? []
+    }
+
     var displayTitle: String { title?.isEmpty == false ? title! : "Untitled" }
     var displayBody: String { body ?? "" }
     var pinned: Bool { isPinned ?? false }

@@ -172,6 +172,10 @@ struct PostDetailView: View {
                     .textSelection(.enabled)
             }
 
+            if !post.media.isEmpty {
+                PostMediaView(media: post.media)
+            }
+
             if post.locked {
                 Label("This thread is locked. No new comments.",
                       systemImage: "lock.fill")

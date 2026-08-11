@@ -220,6 +220,12 @@ struct PostRow: View {
                     .lineLimit(3)
             }
 
+            // Batched onto the feed response, so a grid costs no extra request.
+            // Compact: a feed row should not become a full-bleed photo essay.
+            if !post.media.isEmpty {
+                PostMediaView(media: post.media, isCompact: true)
+            }
+
             HStack(spacing: Theme.Spacing.lg) {
                 Label("\(post.comments)", systemImage: "bubble.right")
                     .font(Theme.Typography.caption)
