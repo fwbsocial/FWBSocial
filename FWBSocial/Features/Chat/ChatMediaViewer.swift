@@ -50,10 +50,10 @@ struct ChatMediaViewer: View {
                         .font(Theme.Typography.preview)
                         .multilineTextAlignment(.center)
                 }
-                .foregroundStyle(.white.opacity(0.75))
+                .foregroundStyle(.secondary)
                 .padding(Theme.Spacing.xxl)
             } else {
-                ProgressView().tint(.white)
+                ProgressView().tint(Color.primary)
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -62,11 +62,22 @@ struct ChatMediaViewer: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.8), .black.opacity(0.35))
+                    // The dark circle behind the glyph stays a literal black: it is a
+                    // scrim over whatever photo happens to be underneath, not a
+                    // themed surface.
+                    .foregroundStyle(Color.primary.opacity(0.8), .black.opacity(0.35))
             }
             .padding(Theme.Spacing.lg)
             .accessibilityIdentifier("chat.media.close")
+            // An identifier is for the test runner; it is not spoken. Without a label
+            // the only way out of a full-screen photo was announced as "button".
+            .accessibilityLabel("Close")
         }
+        // The backdrop is an imposed black regardless of the member's appearance
+        // setting, so the chrome on top of it has to be read in dark terms. Declaring
+        // that once here lets `.primary` and `.secondary` resolve correctly instead of
+        // every call site hand-picking white and hoping it stays right.
+        .environment(\.colorScheme, .dark)
         .statusBarHidden()
         .task {
             do {

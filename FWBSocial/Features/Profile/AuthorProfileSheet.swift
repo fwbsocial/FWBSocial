@@ -258,6 +258,36 @@ struct AuthorByline: View {
             guard let author, author.isTappable else { return }
             onTap(author)
         }
+        // A raw tap gesture on a content shape is invisible to VoiceOver: no button
+        // trait, no action, nothing to activate. Since this byline is the *only* way
+        // to reach a person from the forum (see the note at the top of this file),
+        // that made every member profile in the app unreachable without sight. The
+        // trait and the action are both gated on `isTappable` so a tombstoned author
+        // is still announced as a name, not as a button that does nothing.
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(spokenLabel)
+        .accessibilityAddTraits(tappableAuthor == nil ? [] : .isButton)
+        .accessibilityHint(tappableAuthor == nil ? "" : "Opens their profile.")
+        .accessibilityAction {
+            guard let tappableAuthor else { return }
+            onTap(tappableAuthor)
+        }
+    }
+
+    /// The author only when there is a profile behind them.
+    private var tappableAuthor: ForumAuthor? {
+        guard let author, author.isTappable else { return nil }
+        return author
+    }
+
+    /// Name first, then when — the same order the row is drawn in.
+    private var spokenLabel: String {
+        var parts = [author?.name ?? "Member"]
+        if let timestamp {
+            parts.append(timestamp.formatted(.relative(presentation: .named)))
+            if wasEdited { parts.append("edited") }
+        }
+        return parts.joined(separator: ", ")
     }
 }
 

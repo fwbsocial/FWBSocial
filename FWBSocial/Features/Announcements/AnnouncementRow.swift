@@ -13,6 +13,11 @@ struct AnnouncementRow: View {
                         Image(systemName: "pin.fill")
                             .font(Theme.Typography.micro)
                             .foregroundStyle(Theme.Colors.brand)
+                            // Pinning is why this row sits above the others, and the
+                            // glyph was the only thing saying so — unlabelled, an
+                            // SF Symbol contributes nothing to the row's description.
+                            // Matches the unread dot a few lines below.
+                            .accessibilityLabel("Pinned")
                     }
                     Text(announcement.displayTitle)
                         .font(Theme.Typography.rowTitle)

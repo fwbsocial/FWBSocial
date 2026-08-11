@@ -83,6 +83,15 @@ struct MessageActionMenu: View {
         }
     }
 
+    /// The reaction this member has already left on the message, if any.
+    ///
+    /// Read straight off the message's own reaction map — the server sends the full
+    /// `emoji → user ids` summary with every message, so there is nothing to fetch.
+    private var myReaction: String? {
+        guard let me = AuthService.shared.user.flatMap({ UUID(uuidString: $0.id) }) else { return nil }
+        return message.reactions.first { $0.value.contains(me) }?.key
+    }
+
     private var reactionStrip: some View {
         HStack(spacing: Theme.Spacing.md) {
             ForEach(Self.quickReactions, id: \.self) { emoji in
@@ -93,6 +102,13 @@ struct MessageActionMenu: View {
                     Text(emoji).font(.title2)
                 }
                 .accessibilityIdentifier("chat.react.\(emoji)")
+                // A button whose label is a bare emoji is announced with the Unicode
+                // name of the character ("folded hands", "face with open mouth") and
+                // no verb, so six of them in a row read as an unexplained list rather
+                // than as six ways to react. The selected trait is what tells a member
+                // which one they already left — the strip shows no visual state at all.
+                .accessibilityLabel("React with \(ChatReactionLabels.name(for: emoji))")
+                .accessibilityAddTraits(myReaction == emoji ? .isSelected : [])
             }
         }
         .padding(.horizontal, Theme.Spacing.lg)
@@ -122,4 +138,27 @@ struct MessageActionMenu: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+// MARK: - Spoken names for reaction emoji
+//
+// VoiceOver falls back to the Unicode name of a character, which describes the glyph
+// rather than the gesture ("face with tears of joy" for a laugh). These are the names
+// the strip and the bubble's reaction chips both speak, so the same emoji is never
+// called two different things in two places.
+
+nonisolated enum ChatReactionLabels {
+    private static let names: [String: String] = [
+        "❤️": "heart",
+        "👍": "thumbs up",
+        "😂": "laugh",
+        "😮": "surprise",
+        "😢": "sad",
+        "🙏": "thanks"
+    ]
+
+    /// Falls back to the emoji itself for anything outside the quick strip — a
+    /// reaction can arrive from another client with any character at all, and the
+    /// system's own pronunciation beats saying nothing.
+    static func name(for emoji: String) -> String { names[emoji] ?? emoji }
 }

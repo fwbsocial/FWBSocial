@@ -231,10 +231,19 @@ private struct FullScreenVideo: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.85), .black.opacity(0.35))
+                    // The circle behind the glyph stays a literal black — it is a
+                    // scrim over the video frame, not a themed surface.
+                    .foregroundStyle(Color.primary.opacity(0.85), .black.opacity(0.35))
             }
             .padding(Theme.Spacing.lg)
+            // Icon-only and unlabelled, this was announced as "button" — the only way
+            // out of full-screen playback had no name.
+            .accessibilityLabel("Close")
         }
+        // The backdrop is an imposed black whatever the member's appearance setting
+        // is, so the chrome drawn on it must be read in dark terms. Saying that once
+        // here is what lets `.primary` resolve to the right thing above.
+        .environment(\.colorScheme, .dark)
         .statusBarHidden()
     }
 }
@@ -256,12 +265,8 @@ private struct PhotoLightbox: View {
                     // The FULL object here, not the thumbnail — this is the one
                     // place the original is worth its bytes.
                     if let urlString = photo.url, let url = URL(string: urlString) {
-                        AsyncImage(url: url) { image in
-                            image.resizable().scaledToFit()
-                        } placeholder: {
-                            ProgressView().tint(.white)
-                        }
-                        .tag(index)
+                        LightboxPage(url: url)
+                            .tag(index)
                     }
                 }
             }
@@ -273,13 +278,67 @@ private struct PhotoLightbox: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 28))
-                    .foregroundStyle(.white.opacity(0.85), .black.opacity(0.35))
+                    // The circle behind the glyph stays a literal black — it is a
+                    // scrim over the photo, not a themed surface.
+                    .foregroundStyle(Color.primary.opacity(0.85), .black.opacity(0.35))
             }
             .padding(Theme.Spacing.lg)
             .accessibilityIdentifier("post.photo.close")
+            // The identifier is for the test runner and is never spoken; without a
+            // label the only way out of the lightbox was announced as "button".
+            .accessibilityLabel("Close")
         }
+        // The backdrop is an imposed black whatever the member's appearance setting
+        // is, so the chrome on top of it must be read in dark terms — including the
+        // page dots, which in light mode resolved to a near-black on near-black and
+        // gave no hint that there were more photos to swipe to.
+        .environment(\.colorScheme, .dark)
         .statusBarHidden()
         .task { selection = startIndex }
+    }
+}
+
+/// One page of the lightbox.
+///
+/// Its own view, rather than an inline `AsyncImage`, so each page can own a retry.
+/// `AsyncImage` has no reload call — the only way to re-run a fetch is to hand the
+/// view a new identity — and a token shared across the pager would tear down and
+/// refetch every other photo along with the one that failed.
+private struct LightboxPage: View {
+    let url: URL
+
+    @State private var attempt = 0
+
+    var body: some View {
+        AsyncImage(url: url, transaction: Transaction(animation: .easeIn(duration: 0.18))) { phase in
+            switch phase {
+            case .success(let image):
+                image.resizable().scaledToFit()
+            case .failure:
+                // The old two-branch form had no failure arm at all, so a dropped
+                // connection left the placeholder spinner turning forever: the
+                // lightbox read as hung rather than as a download that failed, and
+                // there was nothing to press.
+                VStack(spacing: Theme.Spacing.md) {
+                    Image(systemName: "photo.badge.exclamationmark")
+                        .font(.system(size: 40, weight: .light))
+                    Text("That photo couldn't be loaded.")
+                        .font(Theme.Typography.preview)
+                        .multilineTextAlignment(.center)
+                    Button("Try again") { attempt += 1 }
+                        .buttonStyle(FWBSecondaryButtonStyle())
+                        .frame(maxWidth: 240)
+                        .padding(.top, Theme.Spacing.sm)
+                }
+                .foregroundStyle(.secondary)
+                .padding(Theme.Spacing.xxl)
+            case .empty:
+                ProgressView().tint(Color.primary)
+            @unknown default:
+                ProgressView().tint(Color.primary)
+            }
+        }
+        .id(attempt)
     }
 }
 

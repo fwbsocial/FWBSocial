@@ -92,6 +92,13 @@ struct ChatReportSheet: View {
                                 .font(Theme.Typography.preview)
                         }
                         .padding(.vertical, 2)
+                        // One stop per message, not four. Left alone, VoiceOver walked
+                        // the sender, the timestamp, the "Reported" badge and the body
+                        // as separate elements, so auditing the bundle — the entire
+                        // reason this preview exists — took four swipes per message and
+                        // scattered the badge away from the message it marks.
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(evidenceLabel(for: entry))
                     }
                 } header: {
                     Text("Exactly what will be sent")
@@ -112,6 +119,12 @@ struct ChatReportSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Send") { Task { await submit() } }
                         .disabled(isSubmitting || bundleMessages.isEmpty)
+                        // What this button does is not what "Send" implies anywhere
+                        // else in an end-to-end encrypted app: it decrypts private
+                        // messages on this device and hands the plaintext to a human
+                        // moderator. A member who cannot see the bundle listed above
+                        // has no other way to learn that before they commit.
+                        .accessibilityHint("Decrypts the \(bundleMessages.count) message\(bundleMessages.count == 1 ? "" : "s") listed above and sends their text to moderators. Kept for one year.")
                         .accessibilityIdentifier("chat.report.send")
                 }
             }
@@ -121,6 +134,15 @@ struct ChatReportSheet: View {
                 Text("A moderator will look at this within 24 hours. You can also block this person from their profile.")
             }
         }
+    }
+
+    /// One spoken sentence per bundled message, in the order the row draws it, with
+    /// the reported one called out by name rather than by a badge colour.
+    private func evidenceLabel(for entry: ChatMessage) -> String {
+        let who = chat.isMine(entry) ? "You" : chat.name(for: entry.senderId)
+        let when = entry.createdAt.formatted(date: .omitted, time: .shortened)
+        let marker = entry.id == message.id ? " Reported message." : ""
+        return "\(who), \(when).\(marker) \(entry.decryptedText ?? "")"
     }
 
     private func submit() async {
