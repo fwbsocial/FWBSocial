@@ -60,9 +60,11 @@ private struct RootSurfaceChrome: ViewModifier {
                         Button {
                             isPresentingProfile = true
                         } label: {
-                            AvatarView(name: user.displayName, url: user.avatarUrl)
-                                .frame(width: 44, height: 44)
-                                .clipShape(Circle())
+                            // AvatarView sizes ITSELF via `size:` — an outer
+                            // .frame() only pads around it (measured: 41pt drawn
+                            // inside a 44pt frame). 46pt = the gear bubble's
+                            // measured diameter on device.
+                            AvatarView(name: user.displayName, url: user.avatarUrl, size: 46)
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Your profile")
