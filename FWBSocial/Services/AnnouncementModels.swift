@@ -101,6 +101,13 @@ nonisolated struct NotificationPreferences: Codable, Sendable, Equatable {
     var notifyDm: Bool
     var notifyFriendRequests: Bool
     var notifyChannelPosts: Bool
+
+    /// Commissioner decision 9's per-user switch. **Not a notification setting**,
+    /// but the server put it on this endpoint on purpose — it belongs to the same
+    /// settings screen, and giving it its own route would have meant a second
+    /// endpoint two phases from now. Defaulted true to match the server's column
+    /// default, so a server that predates the field doesn't read as "off".
+    var allowForumFriendRequests: Bool = true
 }
 
 nonisolated struct NotificationPreferencesUpdate: Encodable, Sendable {
@@ -108,4 +115,5 @@ nonisolated struct NotificationPreferencesUpdate: Encodable, Sendable {
     var notifyDm: Bool?
     var notifyFriendRequests: Bool?
     var notifyChannelPosts: Bool?
+    var allowForumFriendRequests: Bool?
 }
