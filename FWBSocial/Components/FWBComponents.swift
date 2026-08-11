@@ -116,6 +116,12 @@ struct EmptyStateView: View {
         }
         .padding(32)
         .frame(maxWidth: .infinity)
+        // One identifier for every designed empty state, so a test can assert
+        // that a member never SAW one — the prefetch rule's failure mode is an
+        // empty state that flashes for a moment and is then replaced by content
+        // (owner directive 2026-08-11). `ErrorStateView` re-labels its own copy
+        // `error.state` from outside, which still wins.
+        .accessibilityIdentifier("empty.state")
     }
 }
 
