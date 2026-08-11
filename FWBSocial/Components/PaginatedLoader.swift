@@ -22,6 +22,21 @@ final class PaginatedLoader<Item: Decodable & Sendable & Identifiable> {
     private(set) var total: Int?
     var error: String?
 
+    /// The same failure, unflattened.
+    ///
+    /// Phase 8: `error` (a `String`) is what most call sites want to print, but a
+    /// string cannot answer "was this the network?", so no surface built on this
+    /// loader could offer an offline branch. Both are kept in step; new code
+    /// should read this one.
+    private(set) var failure: Error?
+
+    /// True once a load has completed — successfully or not.
+    ///
+    /// Distinguishes "the server said there is nothing" from "nothing has been
+    /// asked yet", which is the difference between showing an empty state and
+    /// showing a spinner.
+    private(set) var hasLoaded = false
+
     private var page = 1
     private let per: Int
 
@@ -41,6 +56,7 @@ final class PaginatedLoader<Item: Decodable & Sendable & Identifiable> {
         guard !isLoading, !reachedEnd else { return }
         isLoading = true
         error = nil
+        failure = nil
         do {
             let response = try await fetch(page, per)
             items.append(contentsOf: response.items)
@@ -58,9 +74,16 @@ final class PaginatedLoader<Item: Decodable & Sendable & Identifiable> {
                 if let total, items.count >= total { reachedEnd = true }
             }
         } catch {
-            self.error = error.localizedDescription
+            // A cancelled load is not a failure. Navigating away mid-fetch tore the
+            // task down and the view came back showing "cancelled" as if the server
+            // had said it — every other loader in the app already guards this.
+            if !isCancellationError(error) {
+                self.error = error.fwbMessage
+                self.failure = error
+            }
         }
         isLoading = false
+        hasLoaded = true
     }
 
     /// Call from a row `.onAppear` to trigger the next page near the end.
