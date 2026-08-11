@@ -154,6 +154,93 @@ struct AvatarView: View {
     }
 }
 
+// MARK: - Keyboard dismissal
+//
+// House convention: tap-outside-to-dismiss on every text field. The trap it
+// avoids is specific — attaching `.onTapGesture` to a `Form` kills every row
+// control in it (rows stop responding to taps entirely), and
+// `.simultaneousGesture` doesn't fix it either. The working shape is a
+// *background layer* behind the content, which is what this does.
+
+extension View {
+    /// Dismiss the keyboard when the user taps outside a field.
+    ///
+    /// Safe on scroll views and stacks. **Do not reach for `.onTapGesture` on a
+    /// `Form`** — use this, which puts the tap target behind the content
+    /// instead of in front of it.
+    func fwbDismissKeyboardOnTap() -> some View {
+        background(
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    UIApplication.shared.sendAction(
+                        #selector(UIResponder.resignFirstResponder),
+                        to: nil, from: nil, for: nil)
+                }
+        )
+    }
+}
+
+// MARK: - Inline form error
+
+/// A single-line validation/error message under a field or form.
+struct FormErrorText: View {
+    let message: String?
+
+    var body: some View {
+        if let message, !message.isEmpty {
+            Label(message, systemImage: "exclamationmark.circle.fill")
+                .font(Theme.Typography.caption)
+                .foregroundStyle(Theme.Colors.danger)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .transition(.opacity)
+        }
+    }
+}
+
+// MARK: - Styled text field
+
+/// The auth-screen field: themed background, no capitalisation surprises.
+struct FWBTextField: View {
+    let title: String
+    @Binding var text: String
+    var systemImage: String?
+    var contentType: UITextContentType?
+    var keyboard: UIKeyboardType = .default
+    var isSecure: Bool = false
+    var submitLabel: SubmitLabel = .next
+    var onSubmit: () -> Void = {}
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.md) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 20)
+            }
+            Group {
+                if isSecure {
+                    SecureField(title, text: $text)
+                } else {
+                    TextField(title, text: $text)
+                }
+            }
+            .textInputAutocapitalization(contentType == .name ? .words : .never)
+            .autocorrectionDisabled()
+            .textContentType(contentType)
+            .keyboardType(keyboard)
+            .submitLabel(submitLabel)
+            .onSubmit(onSubmit)
+        }
+        .padding(.horizontal, Theme.Spacing.lg)
+        .padding(.vertical, 14)
+        .background(Theme.Colors.field, in: Theme.roundedRect(Theme.Radius.control))
+        .overlay(
+            Theme.roundedRect(Theme.Radius.control)
+                .strokeBorder(Theme.Colors.hairline, lineWidth: 1))
+    }
+}
+
 // MARK: - Button styles
 
 struct FWBPrimaryButtonStyle: ButtonStyle {
