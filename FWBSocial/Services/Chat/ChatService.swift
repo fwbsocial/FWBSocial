@@ -220,10 +220,14 @@ final class ChatService {
         myDevices = devices
         if let mine = await resolvedDeviceId(),
            let updated = devices.first(where: { $0.id == mine }) {
-            // The list route always reports `is_root: false`; keep the flag the
-            // registration response gave us rather than clobbering it.
             thisDevice = updated
         }
+        // NOTE: `is_root` is meaningful ONLY on the response to
+        // `PUT /api/chat/devices` — the server computes it from the device count at
+        // registration time and the list route hardcodes `false` for every row. So
+        // `thisDevice.isRoot` goes stale the moment this runs, and
+        // `thisDeviceIsRoot` (set once, at registration) is the flag to read.
+        // Anything that asks "is this the trust root?" must use that one.
     }
 
     /// Devices awaiting approval from this one. The approving device must itself be

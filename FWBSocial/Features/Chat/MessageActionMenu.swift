@@ -7,11 +7,15 @@ import SwiftUI
 // reaction strip needs to sit above the actions, and a context menu cannot hold an
 // interactive row.
 //
-// One action is missing on purpose. Cove offered "delete for everyone"; fwb-server's
-// `DELETE /api/chat/messages/:id` is sender-only and §4.7 is explicit that the
-// server **cannot** remove a message from another participant's device. Offering a
-// button that implies otherwise would be a lie the crypto cannot back up, so the
-// copy says what actually happens.
+// Delete is sender-only and is a HARD delete server-side, so it really does remove
+// the message for everyone who has not already received it. What it cannot do is
+// reach a copy that already decrypted on someone else's phone — §4.7 is explicit —
+// and the confirmation copy says that rather than implying a reach the crypto does
+// not have.
+//
+// There is no Edit row: fwb-server has no route for it (see
+// `ChatFeatureFlags.editMessage`). The absence is a server gap, not a decision made
+// here.
 
 struct MessageActionMenu: View {
     let message: ChatMessage
@@ -31,25 +35,27 @@ struct MessageActionMenu: View {
             reactionStrip
 
             VStack(spacing: 0) {
-                actionRow("Reply", systemImage: "arrowshape.turn.up.left") {
-                    onReply()
-                    dismiss()
+                if ChatFeatureFlags.replyQuoting {
+                    actionRow("Reply", systemImage: "arrowshape.turn.up.left") {
+                        onReply()
+                        dismiss()
+                    }
+                    Divider().padding(.leading, 52)
                 }
 
                 if let text = message.decryptedText, !text.isEmpty {
-                    Divider().padding(.leading, 52)
                     actionRow("Copy", systemImage: "doc.on.doc") {
                         UIPasteboard.general.string = text
                         dismiss()
                     }
                 }
 
-                if isMine {
+                if isMine, ChatFeatureFlags.deleteForEveryone {
                     Divider().padding(.leading, 52)
                     actionRow("Delete", systemImage: "trash", role: .destructive) {
                         isConfirmingDelete = true
                     }
-                } else {
+                } else if !isMine {
                     Divider().padding(.leading, 52)
                     actionRow("Report", systemImage: "flag", role: .destructive) {
                         onReport()

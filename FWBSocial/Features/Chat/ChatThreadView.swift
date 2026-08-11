@@ -22,6 +22,7 @@ struct ChatThreadView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var actionTarget: ChatMessage?
     @State private var reportTarget: ChatMessage?
+    @State private var mediaTarget: ChatMessage?
 
     private var conversation: ChatConversation? { chat.conversation(conversationId) }
     private var messages: [ChatMessage] { chat.messagesByConversation[conversationId] ?? [] }
@@ -30,7 +31,7 @@ struct ChatThreadView: View {
         VStack(spacing: 0) {
             securityBanner
             transcript
-            typingRow
+            if ChatFeatureFlags.typingIndicators { typingRow }
             composer
         }
         .navigationTitle(conversation.map(chat.title(for:)) ?? "Chat")
@@ -62,6 +63,9 @@ struct ChatThreadView: View {
         }
         .sheet(item: $reportTarget) { message in
             ChatReportSheet(message: message, conversationId: conversationId)
+        }
+        .fullScreenCover(item: $mediaTarget) { message in
+            ChatMediaViewer(message: message)
         }
         .alert("Couldn't send", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
@@ -135,8 +139,9 @@ struct ChatThreadView: View {
                             isGroup: conversation?.isGroup ?? false,
                             groupsWithPrevious: groups(message, with: previous),
                             groupsWithNext: groups(message, with: next),
-                            replyPreview: replyPreview(for: message),
+                            replyPreview: ChatFeatureFlags.replyQuoting ? replyPreview(for: message) : nil,
                             onTap: { actionTarget = message },
+                            onOpenMedia: { mediaTarget = message },
                             onRetry: { Task { await chat.retry(message) } }
                         )
                         .id(message.id)
@@ -176,7 +181,7 @@ struct ChatThreadView: View {
 
     private var composer: some View {
         VStack(spacing: 0) {
-            if let replyTo {
+            if ChatFeatureFlags.replyQuoting, let replyTo {
                 HStack(spacing: Theme.Spacing.sm) {
                     Rectangle()
                         .fill(Theme.Colors.brand)
@@ -220,6 +225,7 @@ struct ChatThreadView: View {
                     .background(Theme.Colors.field, in: Capsule())
                     .accessibilityIdentifier("chat.composer")
                     .onChange(of: draft) { _, newValue in
+                        guard ChatFeatureFlags.typingIndicators else { return }
                         Task { await chat.sendTyping(conversationId, isTyping: !newValue.isEmpty) }
                     }
 
@@ -252,7 +258,9 @@ struct ChatThreadView: View {
         defer { isSending = false }
         do {
             try await chat.send(conversationId: conversationId, text: text, replyToId: reply?.id)
-            await chat.sendTyping(conversationId, isTyping: false)
+            if ChatFeatureFlags.typingIndicators {
+                await chat.sendTyping(conversationId, isTyping: false)
+            }
         } catch {
             draft = text
             errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription

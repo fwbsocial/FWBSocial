@@ -24,6 +24,7 @@ struct MessageBubble: View {
     let groupsWithNext: Bool
     let replyPreview: String?
     let onTap: () -> Void
+    let onOpenMedia: () -> Void
     let onRetry: () -> Void
 
     @State private var mediaImage: UIImage?
@@ -56,7 +57,11 @@ struct MessageBubble: View {
         }
         .padding(.vertical, groupsWithNext ? 1 : 3)
         .contentShape(Rectangle())
-        .onTapGesture(perform: onTap)
+        // A photo's tap belongs to the photo — opening an action sheet when someone
+        // taps an image is the wrong verb. Long-press reaches the actions from
+        // either kind of bubble.
+        .onTapGesture { message.contentType == .image ? onOpenMedia() : onTap() }
+        .onLongPressGesture(minimumDuration: 0.35, perform: onTap)
     }
 
     // MARK: Bubble
@@ -175,7 +180,7 @@ struct MessageBubble: View {
                         .foregroundStyle(.tertiary)
                 }
 
-                if isMine {
+                if isMine, ChatFeatureFlags.readReceiptDisplay {
                     receiptGlyph
                 }
             }
