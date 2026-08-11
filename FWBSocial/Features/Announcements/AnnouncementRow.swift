@@ -1,0 +1,58 @@
+import SwiftUI
+
+// MARK: - Feed row
+
+struct AnnouncementRow: View {
+    let announcement: Announcement
+
+    var body: some View {
+        FWBCard {
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                HStack(spacing: Theme.Spacing.sm) {
+                    if announcement.pinned {
+                        Image(systemName: "pin.fill")
+                            .font(Theme.Typography.micro)
+                            .foregroundStyle(Theme.Colors.brand)
+                    }
+                    Text(announcement.displayTitle)
+                        .font(Theme.Typography.rowTitle)
+                        .foregroundStyle(.primary)
+                        .multilineTextAlignment(.leading)
+                    Spacer(minLength: Theme.Spacing.sm)
+                    if announcement.isUnread && AuthService.shared.isSignedIn {
+                        Circle()
+                            .fill(Theme.Colors.brand)
+                            .frame(width: 8, height: 8)
+                            .accessibilityLabel("Unread")
+                    }
+                }
+
+                if !announcement.displayBody.isEmpty {
+                    Text(announcement.displayBody)
+                        .font(Theme.Typography.preview)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                }
+
+                HStack(spacing: Theme.Spacing.sm) {
+                    if let timestamp = announcement.timestamp {
+                        Text(timestamp, format: .relative(presentation: .named))
+                    }
+                    if let author = announcement.authorName {
+                        Text("·")
+                        Text(author)
+                    }
+                    if announcement.isVettedOnly {
+                        StatusBadge("Members", color: Theme.Colors.caution)
+                    }
+                    if announcement.status == "draft" {
+                        StatusBadge("Draft", color: Theme.Colors.caution)
+                    }
+                }
+                .font(Theme.Typography.caption)
+                .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
