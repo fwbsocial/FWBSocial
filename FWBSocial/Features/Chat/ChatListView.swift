@@ -124,13 +124,19 @@ struct ChatListView: View {
     }
 
     private var emptyState: some View {
-        EmptyStateView(
-            icon: "lock.shield",
-            title: "No conversations yet",
-            // No action button: the floating button in the corner IS this action,
-            // and offering the same verb twice reads as two different things.
-            message: "Messages here are end-to-end encrypted — we can't read them, and neither can anyone else. Tap the button to start one with a friend."
-        )
+        // ScrollView container matches Feed's empty-state geometry exactly — bare,
+        // the full-screen theme surface centered this vertically while Feed's
+        // starts under the title (owner: align the two).
+        ScrollView {
+            EmptyStateView(
+                icon: "message.fill",
+                title: "No conversations yet",
+                // No action button: the compose slot in the tab bar IS this action,
+                // and offering the same verb twice reads as two different things.
+                message: "Messages here are end-to-end encrypted — we can't read them, and neither can anyone else. Tap the button to start one with a friend."
+            )
+            .padding()
+        }
     }
 
     private func enrolmentFailure(_ error: String) -> some View {
