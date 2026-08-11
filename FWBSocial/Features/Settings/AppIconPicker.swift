@@ -1,8 +1,10 @@
 import SwiftUI
+import UIKit
 
-/// A grid of app-icon variants. Currently a single "Default" cell — see
-/// `AppearanceService.IconPreference`'s doc comment for why. Structurally
-/// ready for a future alternate icon without changing this view.
+/// A grid of app-icon variants — "Default" (the primary `FWBSocial.icon`, which
+/// follows the Home Screen's icon appearance) and "Dark" (`FWBSocialDark.icon`,
+/// forced dark). Both cells show the icon's REAL composed render, extracted from
+/// the compiled asset catalog — see `AppearanceService.IconPreference.previewImage`.
 struct AppIconPicker: View {
     @State private var appearance = AppearanceService.shared
     @State private var showError = false
@@ -10,12 +12,23 @@ struct AppIconPicker: View {
     private let columns = [GridItem(.adaptive(minimum: 76), spacing: 16)]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            ForEach(AppearanceService.IconPreference.allCases) { option in
-                cell(option)
+        Group {
+            if UIApplication.shared.supportsAlternateIcons {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(AppearanceService.IconPreference.allCases) { option in
+                        cell(option)
+                    }
+                }
+                .padding(.vertical, 4)
+            } else {
+                // Honest, and specific. The old copy showed a live-looking grid
+                // whose taps quietly failed.
+                Text("Alternate icons aren’t available on this device.")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
+        .onAppear { appearance.reconcileIconPreference() }
         .alert("Couldn't change app icon", isPresented: $showError, presenting: appearance.lastIconError) { _ in
             Button("OK", role: .cancel) {}
         } message: { Text($0) }
@@ -30,16 +43,15 @@ struct AppIconPicker: View {
             }
         } label: {
             VStack(spacing: 6) {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Theme.Colors.brandGradient)
-                    .overlay(
-                        Text("FWB")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white))
+                Image(option.previewImage)
+                    .resizable()
+                    .aspectRatio(1, contentMode: .fit)
                     .frame(width: 64, height: 64)
+                    .fwbCorner(14)
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(isActive ? Theme.Colors.brand : Theme.Colors.hairline, lineWidth: isActive ? 3 : 1))
+                            .strokeBorder(isActive ? Theme.Colors.brand : Theme.Colors.hairline,
+                                          lineWidth: isActive ? 3 : 1))
                     .overlay(alignment: .bottomTrailing) {
                         if isActive {
                             Image(systemName: "checkmark.circle.fill")

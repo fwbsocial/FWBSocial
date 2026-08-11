@@ -58,6 +58,21 @@ targets:
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: FWBSocial
+        # Forced-dark alternate for the Settings icon picker (house convention
+        # `feedback_settings_appearance_icon_picker_convention`). FWBSocialDark.icon
+        # is the SAME Icon Composer art with the dark specializations promoted to
+        # the anonymous/base entries and the dark background material authored as
+        # an explicit solid fill — an alternate renders its BASE appearance in
+        # light mode, so without that promotion the "dark" icon would show the
+        # document's blue default gradient on a light home screen.
+        #
+        # Xcode 26 compiles `.icon` documents named here into the alternate slot
+        # and synthesises the CFBundleAlternateIcons entry; INCLUDE_ALL_APP_ICON_ASSETS
+        # is what actually copies the extra icon into the bundle. Both must be
+        # declared HERE — XcodeGen regenerates the pbxproj from this file, so a
+        # setting added by hand in Xcode is deleted on the next `xcodegen`.
+        ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: FWBSocialDark
+        ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS: "YES"
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         # Sign in with Apple (Guideline 4.8) + Declared Age Range (commissioner
         # Q16) + APNs. See FWBSocial.entitlements for the portal capabilities
