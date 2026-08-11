@@ -68,8 +68,10 @@ struct AuthFlowView: View {
 
                 Button("Continue with email") { path.append(.signIn) }
                     .buttonStyle(FWBSecondaryButtonStyle())
+                    .accessibilityIdentifier("auth.continueWithEmail")
 
                 Button("Create an account") { path.append(.register) }
+                    .accessibilityIdentifier("auth.createAccount")
                     .font(Theme.Typography.preview)
                     .foregroundStyle(Theme.Colors.brand)
                     .padding(.top, Theme.Spacing.xs)
@@ -140,6 +142,7 @@ struct SignInView: View {
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(!canSubmit)
+                .accessibilityIdentifier("signIn.submit")
 
                 Button("Forgot your password?", action: onForgotPassword)
                     .font(Theme.Typography.preview)
@@ -157,6 +160,7 @@ struct SignInView: View {
 
     private func submit() {
         guard canSubmit else { return }
+        fwbDismissKeyboard()
         isWorking = true
         errorMessage = nil
         Task {
@@ -202,12 +206,14 @@ struct RegisterView: View {
                              systemImage: "person",
                              contentType: .name) { focus = .email }
                     .focused($focus, equals: .name)
+                    .accessibilityIdentifier("register.displayName")
 
                 FWBTextField(title: "Email", text: $email,
                              systemImage: "envelope",
                              contentType: .emailAddress,
                              keyboard: .emailAddress) { focus = .password }
                     .focused($focus, equals: .email)
+                    .accessibilityIdentifier("register.email")
 
                 FWBTextField(title: "Password", text: $password,
                              systemImage: "lock",
@@ -215,6 +221,7 @@ struct RegisterView: View {
                              isSecure: true,
                              submitLabel: .go) { submit() }
                     .focused($focus, equals: .password)
+                    .accessibilityIdentifier("register.password")
 
                 Text("At least eight characters.")
                     .font(Theme.Typography.micro)
@@ -229,6 +236,7 @@ struct RegisterView: View {
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(!canSubmit)
+                .accessibilityIdentifier("register.submit")
 
                 Text("Next you'll accept the terms and confirm you're \(FWBConfig.minimumAge) or over.")
                     .font(Theme.Typography.micro)
@@ -246,6 +254,7 @@ struct RegisterView: View {
 
     private func submit() {
         guard canSubmit else { return }
+        fwbDismissKeyboard()
         isWorking = true
         errorMessage = nil
         Task {
@@ -322,6 +331,7 @@ struct ForgotPasswordView: View {
 
     private func submit() {
         guard !email.trimmed.isEmpty, !isWorking else { return }
+        fwbDismissKeyboard()
         isWorking = true
         errorMessage = nil
         Task {

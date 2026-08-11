@@ -252,6 +252,13 @@ final class AuthService {
             if await refresh() { return try await rawGet(path) }
             throw APIError.unauthorized
         }
+        // A deleted account answers 404 here (the row is tombstoned, so
+        // `req.liveUser()` finds nothing). That's a dead session, not a missing
+        // endpoint: without this the tokens survive in the Keychain and every
+        // launch re-attempts them.
+        if let http = response as? HTTPURLResponse, http.statusCode == 404 {
+            throw APIError.unauthorized
+        }
         return bytes
     }
 

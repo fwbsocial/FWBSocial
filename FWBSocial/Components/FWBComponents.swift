@@ -162,6 +162,18 @@ struct AvatarView: View {
 // `.simultaneousGesture` doesn't fix it either. The working shape is a
 // *background layer* behind the content, which is what this does.
 
+/// Resign the first responder, wherever it is.
+///
+/// Worth calling as the first thing a form's submit does: without it the
+/// keyboard survives the navigation that follows and sits over the top of the
+/// next screen, covering its controls.
+@MainActor
+func fwbDismissKeyboard() {
+    UIApplication.shared.sendAction(
+        #selector(UIResponder.resignFirstResponder),
+        to: nil, from: nil, for: nil)
+}
+
 extension View {
     /// Dismiss the keyboard when the user taps outside a field.
     ///
@@ -172,11 +184,7 @@ extension View {
         background(
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture {
-                    UIApplication.shared.sendAction(
-                        #selector(UIResponder.resignFirstResponder),
-                        to: nil, from: nil, for: nil)
-                }
+                .onTapGesture { fwbDismissKeyboard() }
         )
     }
 }

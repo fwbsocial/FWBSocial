@@ -120,6 +120,7 @@ struct TermsAcceptanceView: View {
                 }
                 .tint(Theme.Colors.brand)
                 .padding(.top, Theme.Spacing.sm)
+                .accessibilityIdentifier("onboarding.acceptToggle")
 
                 Button {
                     accept()
@@ -128,6 +129,7 @@ struct TermsAcceptanceView: View {
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(!accepted || isWorking)
+                .accessibilityIdentifier("onboarding.continue")
 
                 Button("Sign out") { AuthService.shared.signOut() }
                     .font(Theme.Typography.preview)
@@ -202,6 +204,7 @@ struct AgeGateView: View {
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(isWorking)
+                .accessibilityIdentifier("onboarding.confirmAge")
 
                 Button("Sign out") { AuthService.shared.signOut() }
                     .font(Theme.Typography.preview)

@@ -22,16 +22,25 @@ struct RootTabView: View {
                 NavigationStack(path: $appState.announcementPath) { HomeView() }
             }
 
-            Tab(FWBTab.channels.title, systemImage: FWBTab.channels.systemImage, value: FWBTab.channels) {
-                NavigationStack { memberOnly(ChannelsView(), tab: .channels) }
+            // Gated on `FWBFeatures` — see AppState.swift. At Phase 3 these
+            // have no feature behind them, and carrying three empty tabs pushed
+            // Profile (sign-out, account deletion) into the "More" overflow.
+            if FWBTab.channels.isEnabled {
+                Tab(FWBTab.channels.title, systemImage: FWBTab.channels.systemImage, value: FWBTab.channels) {
+                    NavigationStack { memberOnly(ChannelsView(), tab: .channels) }
+                }
             }
 
-            Tab(FWBTab.events.title, systemImage: FWBTab.events.systemImage, value: FWBTab.events) {
-                NavigationStack { memberOnly(EventsView(), tab: .events) }
+            if FWBTab.events.isEnabled {
+                Tab(FWBTab.events.title, systemImage: FWBTab.events.systemImage, value: FWBTab.events) {
+                    NavigationStack { memberOnly(EventsView(), tab: .events) }
+                }
             }
 
-            Tab(FWBTab.chat.title, systemImage: FWBTab.chat.systemImage, value: FWBTab.chat) {
-                NavigationStack { memberOnly(ChatListView(), tab: .chat) }
+            if FWBTab.chat.isEnabled {
+                Tab(FWBTab.chat.title, systemImage: FWBTab.chat.systemImage, value: FWBTab.chat) {
+                    NavigationStack { memberOnly(ChatListView(), tab: .chat) }
+                }
             }
 
             Tab(FWBTab.profile.title, systemImage: FWBTab.profile.systemImage, value: FWBTab.profile) {

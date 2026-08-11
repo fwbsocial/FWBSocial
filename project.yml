@@ -24,6 +24,18 @@ schemes:
       targets:
         - FWBSocialTests
 
+  # Separate scheme: the smoke test registers a real account on the LIVE server
+  # and deletes it again, so it must never ride along with the unit tests on
+  # every plain `xcodebuild test`. Run it deliberately.
+  FWBSocialSmoke:
+    build:
+      targets:
+        FWBSocial: all
+        FWBSocialUITests: [test]
+    test:
+      targets:
+        - FWBSocialUITests
+
 targets:
   FWBSocial:
     type: application
@@ -82,3 +94,25 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: events.fwb.social.tests
         GENERATE_INFOPLIST_FILE: "YES"
+
+  # End-to-end smoke against the LIVE server (see FWBSocialUITests). Kept out of
+  # the default scheme's test action on purpose — it creates and deletes a real
+  # account, which is not something a routine `xcodebuild test` should do.
+  FWBSocialUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: FWBSocialUITests
+    dependencies:
+      - target: FWBSocial
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: events.fwb.social.uitests
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_TARGET_NAME: FWBSocial
+        # XCTestCase's `setUp`/`tearDown`/`init` are nonisolated, so the project's
+        # default MainActor isolation makes every override an isolation mismatch.
+        # The UI test runs out of process against the app anyway — there is no
+        # app state here to protect.
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated

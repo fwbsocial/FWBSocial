@@ -126,6 +126,7 @@ struct ProfileView: View {
 
             Section {
                 Button("Sign out") { showSignOutConfirm = true }
+                    .accessibilityIdentifier("profile.signOut")
             }
 
             Section {
@@ -139,6 +140,7 @@ struct ProfileView: View {
                     }
                 }
                 .disabled(isDeleting)
+                .accessibilityIdentifier("profile.deleteAccount")
             } footer: {
                 // Guideline 5.1.1(v). Say what actually happens — the server
                 // scrambles the identifying columns, revokes the Apple grant and

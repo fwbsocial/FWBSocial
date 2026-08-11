@@ -42,6 +42,42 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+// MARK: - Feature flags
+//
+// Which tabs exist yet.
+//
+// The plan's shell is Home / Channels / Events / Chat / Profile + Settings
+// (§5.3), and that is still the target. But at Phase 3 the middle three have no
+// feature behind them, and six tabs is one more than iPhone's bar holds — iOS
+// collapses the overflow into "More", which put **Profile** there. Profile is
+// where sign-out and account deletion live, and Guideline 5.1.1(v) expects
+// deletion to be findable; burying it behind "More" so that three empty
+// placeholders can sit in the bar is the wrong trade for a build that goes to
+// the commissioner and, later, to a reviewer.
+//
+// So each tab is gated on its feature actually existing. Flip a flag the day the
+// phase lands — that is the whole change, and `RootTabView` needs no edit.
+nonisolated enum FWBFeatures {
+    /// Phase 4 (PLAN.md §4.2).
+    static let channels = false
+    /// Phase 2/7 — Luma events and post-event friending (§4.5, §7).
+    static let events = false
+    /// Phase 6 — E2EE chat (§4.3).
+    static let chat = false
+}
+
+extension FWBTab {
+    /// Whether this tab has a feature behind it yet.
+    var isEnabled: Bool {
+        switch self {
+        case .channels: return FWBFeatures.channels
+        case .events:   return FWBFeatures.events
+        case .chat:     return FWBFeatures.chat
+        case .home, .profile, .settings: return true
+        }
+    }
+}
+
 /// Root app-wide state: tab selection, the Home tab's navigation path, and the
 /// landing spot for push-driven navigation (`PushCoordinator.drain(appState:)`).
 @Observable

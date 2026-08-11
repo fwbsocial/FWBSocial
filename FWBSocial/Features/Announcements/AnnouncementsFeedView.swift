@@ -92,6 +92,7 @@ struct AnnouncementsFeedView: View {
             .padding(Theme.Spacing.lg)
         }
         .background(Theme.Colors.background)
+        .accessibilityIdentifier("home.feed")
         .refreshable { await reload() }
         .navigationTitle("fwb social")
         .navigationDestination(for: String.self) { id in
@@ -157,6 +158,7 @@ struct AnnouncementsFeedView: View {
                     .foregroundStyle(.secondary)
                 Button("Sign in or create an account") { showAuthSheet = true }
                     .buttonStyle(FWBPrimaryButtonStyle())
+                    .accessibilityIdentifier("home.signInCTA")
                     .padding(.top, Theme.Spacing.xs)
             }
         }
