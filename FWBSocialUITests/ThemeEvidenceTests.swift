@@ -62,6 +62,62 @@ final class ThemeEvidenceTests: XCTestCase {
         }
     }
 
+    /// The picker's cells rendering at all already proves the alternate is
+    /// declared — with none registered, `supportsAlternateIcons` is false and the
+    /// grid is replaced by its unavailable message. This goes one further and
+    /// proves the switch itself lands, which is the half that a missing
+    /// `INCLUDE_ALL_APPICON_ASSETS` would silently break: the name is declared,
+    /// the artwork never reaches the bundle, and `setAlternateIconName` fails at
+    /// the moment a member taps it.
+    func testAlternateIconSwitches() throws {
+        app.launch()
+        openSettings()
+
+        let dark = app.buttons["Dark icon"].firstMatch
+        let standard = app.buttons["Default icon"].firstMatch
+        XCTAssertTrue(dark.waitForExistence(timeout: timeout),
+                      "the Dark icon cell should be in the picker. Tree:\n\(app.debugDescription)")
+
+        // The alternate icon SURVIVES the app being deleted and reinstalled —
+        // it is SpringBoard's state, not the app's — so this cannot assume it
+        // starts on Default. Getting there is itself the first half of the
+        // assertion, and it exercises `reconcileIconPreference`, which is what
+        // notices the picker and the home screen have drifted apart.
+        if !standard.isSelected {
+            standard.tap()
+            dismissIconChangedAlert()
+            wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: standard)],
+                 timeout: 15)
+        }
+
+        dark.tap()
+        // iOS puts up its own "You have changed the icon for …" confirmation,
+        // owned by SpringBoard rather than by the app. It is also the proof the
+        // change went through — but it sits over the app's tree, so nothing
+        // below can be read until it is gone.
+        dismissIconChangedAlert()
+
+        wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: dark)],
+             timeout: 15)
+        XCTAssertFalse(standard.isSelected, "picking Dark should deselect Default")
+
+        // Put it back, so the next run starts from the same place.
+        standard.tap()
+        dismissIconChangedAlert()
+        wait(for: [expectation(for: NSPredicate(format: "isSelected == true"), evaluatedWith: standard)],
+             timeout: 15)
+    }
+
+    /// Taps OK on the system's icon-change confirmation. Queried on SpringBoard,
+    /// not on the app: `app.alerts` never sees it.
+    private func dismissIconChangedAlert() {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let ok = springboard.alerts.buttons["OK"].firstMatch
+        XCTAssertTrue(ok.waitForExistence(timeout: 15),
+                      "iOS should confirm the icon change — its absence means setAlternateIconName never took")
+        ok.tap()
+    }
+
     // MARK: - Driving
 
     private func openSettings() {
