@@ -18,14 +18,20 @@ struct ChatListView: View {
         Group {
             if let error = chat.enrolmentError {
                 enrolmentFailure(error)
-            } else if chat.conversations.isEmpty, !chat.isLoadingConversations,
+            } else if chat.conversations.isEmpty, !chat.hasLoadedConversations {
+                // First entry ever this session: one spinner, once. After the
+                // first result, refreshes are silent (ChatService) so revisiting
+                // the tab never flashes states the member didn't cause.
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if chat.conversations.isEmpty,
                       let failure = chat.conversationsError {
                 // Ahead of the empty state deliberately. `ChatService` used to log
                 // and drop this error, so a member with no signal was shown "No
                 // conversations yet" — a confident, friendly claim about their
                 // account that the app had no basis for.
                 ErrorStateView(error: failure) { Task { await chat.refreshConversations() } }
-            } else if chat.conversations.isEmpty && !chat.isLoadingConversations {
+            } else if chat.conversations.isEmpty {
                 emptyState
             } else {
                 list

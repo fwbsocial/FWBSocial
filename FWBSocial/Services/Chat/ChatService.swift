@@ -58,6 +58,13 @@ final class ChatService {
     /// one — the frame carries a conversation id precisely so it doesn't have to.
     private(set) var typingByConversation: [UUID: Set<UUID>] = [:]
     private(set) var isLoadingConversations = false
+    /// True once the conversation list has been loaded (or definitively failed)
+    /// at least once this session. Until then the list view shows its one
+    /// initial spinner; after it, refreshes are SILENT — the house prefetch
+    /// rule: show what you have, update behind it, never flash a state change
+    /// the member didn't cause (owner report: the empty state visibly reloaded
+    /// on every tab entry).
+    private(set) var hasLoadedConversations = false
     private(set) var hasMoreByConversation: [UUID: Bool] = [:]
 
     /// The last conversation-list load failed, and this is why.
@@ -453,8 +460,10 @@ final class ChatService {
     // MARK: - Conversations
 
     func refreshConversations() async {
-        isLoadingConversations = true
-        defer { isLoadingConversations = false }
+        // Visible loading only before the FIRST result. Every subsequent
+        // refresh happens behind the current content.
+        if !hasLoadedConversations { isLoadingConversations = true }
+        defer { isLoadingConversations = false; hasLoadedConversations = true }
         do {
             let dtos = try await ChatAPI.conversations()
             conversations = dtos.map(ChatConversation.init(dto:))
