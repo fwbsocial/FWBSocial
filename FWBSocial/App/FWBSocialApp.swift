@@ -3,6 +3,7 @@ import SwiftUI
 @main
 struct FWBSocialApp: App {
     @UIApplicationDelegateAdaptor(FWBAppDelegate.self) private var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
 
     @State private var appState = AppState.shared
     @State private var appearance = AppearanceService.shared
@@ -45,6 +46,19 @@ struct FWBSocialApp: App {
                 }
                 .task {
                     await AuthService.shared.restoreSession()
+
+                    // **Launch prefetch — owner directive 2026-08-11: a member
+                    // never sees a tab load.** Every tab's data is fetched here,
+                    // in parallel and without being awaited, so the first tap on
+                    // any of the four shows content instead of a spinner.
+                    //
+                    // It sits AFTER `restoreSession()` and not in `RootTabView`'s
+                    // `.task` on purpose: the two `.task`s start together, so a
+                    // prefetch from the shell would race the restore and every
+                    // store would ask the signed-out route for a signed-in
+                    // member. `AppPrefetch` documents the rest.
+                    AppPrefetch.warmAll()
+
                     // Ask for notification authorization only once there's a
                     // session — a permission prompt on first launch, before the
                     // member knows what the app is, is the reliable way to get
@@ -53,6 +67,12 @@ struct FWBSocialApp: App {
                         PushCoordinator.shared.requestAuthorizationAndRegister()
                     }
                     PushCoordinator.shared.drain(appState: appState)
+                }
+                // Returning to the foreground: refresh every store SILENTLY, and
+                // no more than once a minute. Stale content updates underneath
+                // the member — nothing moves that they did not cause.
+                .onChange(of: scenePhase) { _, phase in
+                    if phase == .active { AppPrefetch.applicationDidBecomeActive() }
                 }
                 .onChange(of: auth.isSignedIn) { _, signedIn in
                     if signedIn { PushCoordinator.shared.requestAuthorizationAndRegister() }

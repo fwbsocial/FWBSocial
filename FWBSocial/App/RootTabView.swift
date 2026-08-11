@@ -132,19 +132,24 @@ struct RootTabView: View {
             appState.selectedTab = .chat
             if appState.chatPath.last != id { appState.chatPath.append(id) }
         }
+        // Signing in warms every tab; signing out clears every store. The launch
+        // prefetch itself lives in `FWBSocialApp`, where it can run *after*
+        // session restore rather than racing it — see `AppPrefetch`.
         .onChange(of: auth.isSignedIn) { _, signedIn in
             if signedIn {
-                Task { await chat.start() }
+                AppPrefetch.warmAll()
             } else {
-                chat.handleSignOut()
+                AppPrefetch.handleSignOut()
             }
         }
-        .task {
-            // Session restore already ran in `FWBSocialApp`; if it produced a
-            // session, enrol this device now rather than waiting for the member to
-            // open the Chat tab. `PUT /api/chat/devices` sits outside the vetting
-            // gate precisely so this can happen at first login (§4.6).
-            if auth.isSignedIn { await chat.start() }
+        // The vetting transition. A pending member's Channels, Events and Chat
+        // all answer 403; vetting flips server-side from a Luma check-in, which
+        // can happen with the app open and in the member's hand at the event.
+        // Without this the three tabs keep showing "you aren't vetted yet" until
+        // the app is relaunched — see `AppPrefetch.vettingDidChange`.
+        .onChange(of: auth.user?.vettingState) { previous, current in
+            guard previous != nil, previous != current else { return }
+            AppPrefetch.vettingDidChange()
         }
     }
 
