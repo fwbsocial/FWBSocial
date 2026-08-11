@@ -154,8 +154,11 @@ private struct AttendeeCard: View {
     var body: some View {
         FWBCard(padding: Theme.Spacing.md) {
             VStack(spacing: Theme.Spacing.sm) {
-                AvatarView(name: attendee.displayName, url: attendee.avatarUrl)
-                    .frame(width: 56, height: 56)
+                // The avatar is the card's hero (owner directive 2026-08-11:
+                // same width, taller card, face fills the space). `size:` is
+                // AvatarView's real knob — an outer .frame only pads around
+                // its internal default (the chrome bug, same disease).
+                AvatarView(name: attendee.displayName, url: attendee.avatarUrl, size: 104)
 
                 VStack(spacing: 2) {
                     Text(attendee.displayName)
