@@ -44,7 +44,7 @@ struct AppIconPicker: View {
                         if isActive {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 20, weight: .bold))
-                                .foregroundStyle(.white, Theme.Colors.brand)
+                                .foregroundStyle(Theme.Colors.onBrand, Theme.Colors.brand)
                                 .offset(x: 4, y: 4)
                         }
                     }

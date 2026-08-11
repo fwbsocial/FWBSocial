@@ -257,7 +257,10 @@ struct FWBPrimaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Theme.Typography.headline)
-            .foregroundStyle(.white)
+            // Adaptive, not `.white` — see `Theme.Colors.onBrand`. This one style
+            // backs every primary CTA in the app, so the dark-mode contrast failure
+            // it carried was app-wide.
+            .foregroundStyle(Theme.Colors.onBrand)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(Theme.Colors.brand.opacity(isEnabled ? 1 : 0.4), in: Theme.roundedRect(Theme.Radius.control))

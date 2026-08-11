@@ -42,7 +42,32 @@ struct AuthFlowView: View {
 
     // MARK: Welcome
 
+    // The welcome column is vertically centred by its own spacers, which is right
+    // until Dynamic Type makes it taller than the screen. At the accessibility
+    // sizes the 46 pt Sue wordmark, the 64 pt mark, the subtitle, three buttons and
+    // the legal line do not fit — and because this was a plain `VStack` with no
+    // scroll view, the sign-in buttons ended up below the bezel with no way to
+    // reach them. The app's very first screen, unusable, at a setting Apple
+    // themselves test with.
+    //
+    // `ViewThatFits` keeps the centred composition wherever it still fits and only
+    // falls back to scrolling when it genuinely cannot — which is better than
+    // making every member scroll a screen that fits.
     private var welcome: some View {
+        ViewThatFits(in: .vertical) {
+            welcomeColumn
+            ScrollView { welcomeColumn }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Colors.background)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("Not now") { dismiss() }
+            }
+        }
+    }
+
+    private var welcomeColumn: some View {
         VStack(spacing: 0) {
             Spacer(minLength: Theme.Spacing.xxl)
 
@@ -87,13 +112,7 @@ struct AuthFlowView: View {
             .padding(.horizontal, Theme.Spacing.xl)
             .padding(.bottom, Theme.Spacing.xxl)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Colors.background)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button("Not now") { dismiss() }
-            }
-        }
+        .frame(maxWidth: .infinity)
     }
 }
 
@@ -138,7 +157,7 @@ struct SignInView: View {
                 Button {
                     submit()
                 } label: {
-                    if isWorking { ProgressView().tint(.white) } else { Text("Sign in") }
+                    if isWorking { ProgressView().tint(Theme.Colors.onBrand) } else { Text("Sign in") }
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(!canSubmit)
@@ -232,7 +251,7 @@ struct RegisterView: View {
                 Button {
                     submit()
                 } label: {
-                    if isWorking { ProgressView().tint(.white) } else { Text("Create account") }
+                    if isWorking { ProgressView().tint(Theme.Colors.onBrand) } else { Text("Create account") }
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(!canSubmit)
@@ -314,7 +333,7 @@ struct ForgotPasswordView: View {
                     Button {
                         submit()
                     } label: {
-                        if isWorking { ProgressView().tint(.white) } else { Text("Send reset link") }
+                        if isWorking { ProgressView().tint(Theme.Colors.onBrand) } else { Text("Send reset link") }
                     }
                     .buttonStyle(FWBPrimaryButtonStyle())
                     .disabled(email.trimmed.isEmpty || isWorking)

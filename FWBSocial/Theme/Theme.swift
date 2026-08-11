@@ -53,6 +53,21 @@ enum Theme {
         /// A soft, low-alpha brand wash for fills (avatar rings, chips).
         static let brandSoft = Brand.base.opacity(0.14)
 
+        /// Foreground for anything drawn ON `brand` — primary button titles, sent
+        /// bubble text, the unread capsule's number.
+        ///
+        /// **Not `Color.white`.** The accent is adaptive by design (light `#25735F`,
+        /// dark `#56BFA5`), so a fixed white foreground tracks only one of them:
+        /// against the dark-mode mint it measures ≈2.1:1, well under WCAG AA's 4.5,
+        /// and it was doing that on every sent chat bubble and every primary CTA in
+        /// the app. Flipping to a near-black in dark restores ≈9:1 without touching
+        /// the accent, which the icon derives from.
+        static let onBrand = Color(uiColor: UIColor { tc in
+            tc.userInterfaceStyle == .dark
+                ? UIColor(red: 0.043, green: 0.114, blue: 0.094, alpha: 1)  // #0B1D18
+                : UIColor.white
+        })
+
         // — Bubbles (chat, PLAN.md §4.3) —
         static let bubbleSent = Brand.base
         static let bubbleReceived = Color(uiColor: UIColor { tc in
@@ -60,7 +75,7 @@ enum Theme {
                 ? UIColor(white: 0.23, alpha: 1)
                 : UIColor(white: 0.91, alpha: 1)
         })
-        static let bubbleSentText = Color.white
+        static let bubbleSentText = onBrand
         static let bubbleReceivedText = Color.primary
 
         // — Surfaces —
