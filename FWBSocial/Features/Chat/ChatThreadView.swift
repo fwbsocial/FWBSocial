@@ -23,6 +23,7 @@ struct ChatThreadView: View {
     @State private var actionTarget: ChatMessage?
     @State private var reportTarget: ChatMessage?
     @State private var mediaTarget: ChatMessage?
+    @State private var isPresentingDetails = false
 
     private var conversation: ChatConversation? { chat.conversation(conversationId) }
     private var messages: [ChatMessage] { chat.messagesByConversation[conversationId] ?? [] }
@@ -45,6 +46,26 @@ struct ChatThreadView: View {
                 }
                 .accessibilityIdentifier("chat.details")
             }
+        }
+        // Owner directive 2026-08-11: every page registers. A thread's own action
+        // is the one thing the transcript cannot show you — who is in it, what the
+        // retention is, and the safety number.
+        //
+        // Presented as a sheet rather than pushed, unlike the toolbar item above.
+        // The Chat tab's `NavigationStack` is driven by a typed `[UUID]` path
+        // (AppState.chatPath) so that a push notification can open a thread on a
+        // tab nobody has visited; a second, differently-typed destination cannot be
+        // put on that path, and mixing a path-driven stack with an
+        // `isPresented:`-driven destination is exactly the arrangement SwiftUI
+        // warns about. The corner keeps the push, the slot takes the sheet.
+        .floatingAction(
+            isVisible: true,
+            systemImage: "info.circle",
+            label: "Details",
+            voiceOverLabel: "Conversation details"
+        ) { isPresentingDetails = true }
+        .sheet(isPresented: $isPresentingDetails) {
+            DismissableSheet { ConversationSettingsView(conversationId: conversationId) }
         }
         .task {
             await chat.loadMessages(conversationId)
