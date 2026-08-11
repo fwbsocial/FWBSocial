@@ -9,11 +9,23 @@ private let logger = Logger(subsystem: "events.fwb.social", category: "Auth")
 enum AuthError: LocalizedError {
     case invalidCredentials
     case message(String)
+    /// `PUT /api/auth/profile` answered **409**. Someone else holds that handle —
+    /// possibly claimed in the milliseconds since the availability check, which
+    /// is an ordinary outcome and not a client bug. Distinguished from
+    /// `.message` so the username field can mark itself rather than the form
+    /// showing an anonymous banner.
+    case usernameTaken(String)
+    /// `PUT /api/auth/profile` answered **422** — the handle broke a rule. That
+    /// status is username-specific on this route: display name and bio failures
+    /// are 400s.
+    case usernameRejected(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidCredentials: return "That email or password didn't match."
         case .message(let m): return m
+        case .usernameTaken(let m): return m
+        case .usernameRejected(let m): return m
         }
     }
 }
@@ -28,7 +40,7 @@ enum AuthError: LocalizedError {
 // Routes, as deployed:
 //   POST   /api/auth/register | login | apple | refresh
 //   POST   /api/auth/forgot-password | reset-password | verify-email
-//   GET    /api/auth/me
+//   GET    /api/auth/me | username-availability?u=
 //   POST   /api/auth/logout | change-password | resend-verification | avatar
 //   PUT    /api/auth/profile
 //   DELETE /api/auth/account
@@ -291,9 +303,25 @@ final class AuthService {
         } catch APIError.decodingError {
             // The route may answer with an envelope or 204; the write landed.
             await reloadUser()
-        } catch let APIError.httpError(_, message) {
-            throw AuthError.message(message ?? "Couldn't save those changes.")
+        } catch let APIError.httpError(code, message) {
+            // 409 and 422 are the username's two refusals and nothing else's on
+            // this route (server `AuthController.updateProfile`: display name and
+            // bio fail with 400). Typed, so the field can own the message.
+            switch code {
+            case 409: throw AuthError.usernameTaken(message ?? "That username is taken.")
+            case 422: throw AuthError.usernameRejected(message ?? "That username isn't valid.")
+            default:  throw AuthError.message(message ?? "Couldn't save those changes.")
+            }
         }
+    }
+
+    /// Live availability for a candidate handle (`GET /api/auth/username-availability`).
+    ///
+    /// Deliberately NOT wrapped in a `try?` here: the caller has to be able to
+    /// tell "the server says taken" from "we couldn't ask", because those two
+    /// answers must not disable Save the same way.
+    func usernameAvailability(_ candidate: String) async throws -> UsernameAvailabilityDTO {
+        try await api.usernameAvailability(candidate)
     }
 
     func updateProfile(displayName: String) async throws {
@@ -313,9 +341,27 @@ final class AuthService {
         try await updateProfile(ProfileUpdate(hideMessagePreviews: hideMessagePreviews))
     }
 
+    /// Upload a new avatar and publish it everywhere.
+    ///
+    /// The route answers the **full user**, so the new signed URL is applied to
+    /// `user` from the response itself rather than after a second round trip:
+    /// every `AvatarView` in the app reads `AuthService.shared.user`, and an
+    /// `@Observable` write here is what repaints them. `reloadUser()` still runs
+    /// on the decode-failure path so an envelope change degrades to slow rather
+    /// than to a stale avatar.
     func uploadAvatar(_ imageData: Data, fileName: String = "avatar.jpg", mimeType: String = "image/jpeg") async throws {
-        let _: EmptyResponse = try await api.upload("/api/auth/avatar", fileData: imageData, fileName: fileName, mimeType: mimeType)
-        await reloadUser()
+        do {
+            let updated: AuthUser = try await api.upload(
+                "/api/auth/avatar", fileData: imageData, fileName: fileName, mimeType: mimeType)
+            user = updated
+        } catch APIError.decodingError {
+            await reloadUser()
+        } catch let APIError.httpError(_, message) {
+            // 503 is the server saying R2 is unconfigured — a real, actionable
+            // answer ("Photo uploads aren't available yet"), not a fault. Its
+            // reason is already member-facing.
+            throw AuthError.message(message ?? "We couldn't upload that photo.")
+        }
     }
 
     struct ChangePasswordBody: Encodable {
