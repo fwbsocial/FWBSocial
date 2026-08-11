@@ -98,16 +98,15 @@ struct AnnouncementsFeedView: View {
         .navigationDestination(for: String.self) { id in
             AnnouncementDetailView(announcementId: id, preloaded: loader.items.first { $0.id == id })
         }
+        // The compose affordance moved to the floating action button (owner
+        // navigation directive) — the trailing corner is the gear now.
+        .rootSurfaceChrome()
+        .floatingAction(
+            isVisible: auth.isAdmin,
+            systemImage: "square.and.pencil",
+            label: "New announcement"
+        ) { showComposer = true }
         .toolbar {
-            if auth.isAdmin {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showComposer = true
-                    } label: {
-                        Label("New announcement", systemImage: "square.and.pencil")
-                    }
-                }
-            }
             if !auth.isSignedIn {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Sign in") { showAuthSheet = true }

@@ -39,6 +39,7 @@ struct ChannelsView: View {
             }
         }
         .navigationTitle("Channels")
+        .rootSurfaceChrome()
         .task {
             await blocks.loadIfNeeded()
             await loadIfNeeded()

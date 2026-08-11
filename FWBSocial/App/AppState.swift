@@ -9,13 +9,15 @@ import Observation
 // friending / new-conversation flows only (§4.8, and commissioner Q9 removes
 // member search from v1 entirely).
 
+// OWNER NAVIGATION DIRECTIVE 2026-08-10: four tabs. Profile and Settings left the
+// bar for the top-left avatar and top-right gear on every root surface
+// (`rootSurfaceChrome()`), which also freed the bar from iOS's five-slot overflow —
+// the reason the Events tab could not previously coexist with Profile.
 enum FWBTab: String, CaseIterable, Identifiable, Hashable {
     case home
     case channels
-    case events
     case chat
-    case profile
-    case settings
+    case events
 
     var id: String { rawValue }
 
@@ -25,8 +27,6 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
         case .channels: return "Channels"
         case .events:   return "Events"
         case .chat:     return "Chat"
-        case .profile:  return "Profile"
-        case .settings: return "Settings"
         }
     }
 
@@ -36,8 +36,6 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
         case .channels: return "bubble.left.and.bubble.right"
         case .events:   return "calendar"
         case .chat:     return "lock.shield"
-        case .profile:  return "person.crop.circle"
-        case .settings: return "gearshape"
         }
     }
 }
@@ -87,7 +85,7 @@ extension FWBTab {
         case .channels: return FWBFeatures.channels
         case .events:   return FWBFeatures.events
         case .chat:     return FWBFeatures.chat
-        case .home, .profile, .settings: return true
+        case .home:     return true
         }
     }
 }
@@ -129,6 +127,10 @@ final class AppState {
     /// A friending window to open once the tab is up. Set by the
     /// `FRIENDING_WINDOW` push, consumed and cleared by `EventsView`.
     var pendingEventId: String?
+
+    /// Raised when a route needs the Profile sheet — a friend-request push, whose
+    /// destination (the friends list) lives inside Profile.
+    var isPresentingProfile = false
 
     /// Raised by a `DEVICE_APPROVAL` push — a second device is waiting, and that
     /// push exists because the WebSocket frame only reaches a foregrounded app.

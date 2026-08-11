@@ -25,6 +25,9 @@ enum PendingPush: Sendable, Equatable {
     /// The body the member reads is produced by the notification extension, on
     /// device; this is only the tap route.
     case conversation(id: UUID)
+    /// The friends list, which lives inside Profile — now a sheet rather than a
+    /// tab (owner navigation directive).
+    case profile
     /// A post-event friending window just opened. Carries `luma_event_id` so the
     /// tap lands on the roster, not the tab — the window is 48 hours long and this
     /// push is the only announcement of it.
@@ -186,7 +189,7 @@ final class PushCoordinator {
         case "DEVICE_APPROVAL":
             enqueue(.devices)
         case "FRIEND_REQUEST", "FRIEND_ACCEPTED":
-            enqueue(.tab(.profile))
+            enqueue(.profile)
         case "fwb_channel_post":
             enqueue(.tab(.channels))
         default:
@@ -218,6 +221,8 @@ final class PushCoordinator {
             appState.openConversation(id: id)
         case .friendingWindow(let lumaEventId):
             appState.openFriendingWindow(lumaEventId: lumaEventId)
+        case .profile:
+            appState.isPresentingProfile = true
         case .devices:
             appState.selectedTab = .chat
             appState.isPresentingDevices = true

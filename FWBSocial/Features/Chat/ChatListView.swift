@@ -27,16 +27,12 @@ struct ChatListView: View {
         }
         .navigationTitle("Chat")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    isPresentingNew = true
-                } label: {
-                    Label("New conversation", systemImage: "square.and.pencil")
-                }
-                .accessibilityIdentifier("chat.new")
-            }
-        }
+        .rootSurfaceChrome()
+        .floatingAction(
+            isVisible: true,
+            systemImage: "square.and.pencil",
+            label: "New conversation"
+        ) { isPresentingNew = true }
         .sheet(isPresented: $isPresentingNew) {
             NavigationStack { NewConversationView() }
         }
@@ -109,9 +105,9 @@ struct ChatListView: View {
         EmptyStateView(
             icon: "lock.shield",
             title: "No conversations yet",
-            message: "Messages here are end-to-end encrypted — we can't read them, and neither can anyone else. Start one with a friend.",
-            actionTitle: "New conversation",
-            action: { isPresentingNew = true }
+            // No action button: the floating button in the corner IS this action,
+            // and offering the same verb twice reads as two different things.
+            message: "Messages here are end-to-end encrypted — we can't read them, and neither can anyone else. Tap the button to start one with a friend."
         )
     }
 

@@ -100,19 +100,14 @@ struct ChannelFeedView: View {
                 }
             }
 
-            // Only where the resolved role allows it.
-            if current.mayPost && !current.archived {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        isComposing = true
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .accessibilityLabel("New post")
-                    .accessibilityIdentifier("channel.newPost")
-                }
-            }
         }
+        // Only where the resolved role allows it — a button that appears and then
+        // 403s is worse than no button.
+        .floatingAction(
+            isVisible: current.mayPost && !current.archived,
+            systemImage: "square.and.pencil",
+            label: "New post"
+        ) { isComposing = true }
         .task {
             guard !hasLoaded else { return }
             await blocks.loadIfNeeded()

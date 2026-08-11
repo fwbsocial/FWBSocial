@@ -1,8 +1,12 @@
 import SwiftUI
 
-/// The app's tab shell (PLAN.md §5.3). Settings is a trailing-separated tab via
-/// `Tab(role: .search)` — the house convention. `SettingsView` is not
-/// `.searchable`; the role is borrowed only for its placement.
+/// The app's tab shell.
+///
+/// **OWNER NAVIGATION DIRECTIVE 2026-08-10: four tabs.** Home / Channels / Chat /
+/// Events. Profile and Settings left the bar for the top-left avatar and top-right
+/// gear that `rootSurfaceChrome()` puts on every root surface — which is also what
+/// made room for Events, since iPhone's bar holds five and a sixth was collapsing
+/// Profile (sign-out, account deletion) into the "More" overflow.
 ///
 /// **The shell is not behind auth.** Home renders announcements signed out
 /// (PLAN.md §4.1); the member-only tabs show a sign-in prompt instead of an
@@ -32,16 +36,6 @@ struct RootTabView: View {
                 }
             }
 
-            if FWBTab.events.isEnabled {
-                Tab(FWBTab.events.title, systemImage: FWBTab.events.systemImage, value: FWBTab.events) {
-                    // Path in AppState so a FRIENDING_WINDOW push can deep-link the
-                    // roster on a tab that was never opened.
-                    NavigationStack(path: $appState.eventPath) {
-                        memberOnly(EventsView(), tab: .events)
-                    }
-                }
-            }
-
             if FWBTab.chat.isEnabled {
                 Tab(FWBTab.chat.title, systemImage: FWBTab.chat.systemImage, value: FWBTab.chat) {
                     // The path lives in AppState so a chat push — or a thread
@@ -57,16 +51,16 @@ struct RootTabView: View {
                 .badge(chat.unreadTotal)
             }
 
-            Tab(FWBTab.profile.title, systemImage: FWBTab.profile.systemImage, value: FWBTab.profile) {
-                NavigationStack { ProfileView() }
+            if FWBTab.events.isEnabled {
+                Tab(FWBTab.events.title, systemImage: FWBTab.events.systemImage, value: FWBTab.events) {
+                    // Path in AppState so a FRIENDING_WINDOW push can deep-link the
+                    // roster on a tab that was never opened.
+                    NavigationStack(path: $appState.eventPath) {
+                        memberOnly(EventsView(), tab: .events)
+                    }
+                }
             }
 
-            // `role: .search` pins this tab trailing-separated in the stock bar
-            // regardless of source order — the mechanism, not a search feature.
-            Tab(FWBTab.settings.title, systemImage: FWBTab.settings.systemImage,
-                value: FWBTab.settings, role: .search) {
-                NavigationStack { SettingsView() }
-            }
         }
         .tint(Theme.Colors.brand)
         .sheet(isPresented: $appState.isPresentingAuth) { AuthFlowView() }

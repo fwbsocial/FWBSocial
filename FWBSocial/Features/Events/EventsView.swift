@@ -61,6 +61,7 @@ struct EventsView: View {
             .padding()
         }
         .navigationTitle("Events")
+        .rootSurfaceChrome()
         .navigationDestination(for: String.self) { lumaEventId in
             FriendingWindowView(
                 lumaEventId: lumaEventId,

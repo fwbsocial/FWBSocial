@@ -45,11 +45,40 @@ final class APIClient {
 
     static let shared = APIClient()
 
+    /// DEBUG-only: seed the session from the launch environment.
+    ///
+    /// UI smokes were spending most of their runtime driving a sign-in form, and
+    /// losing runs to it — iOS's strong-password sheet steals focus from a
+    /// `SecureField` the moment it takes focus, and the failure surfaces much later
+    /// as "that email or password didn't match", which points at seeding rather
+    /// than at stolen keystrokes.
+    ///
+    /// Authentication itself is covered by `SmokeTests`, which drives the real form
+    /// deliberately. Every OTHER smoke wants a session, not a sign-in, and this is
+    /// the same DEBUG-only seam `FWB_API_BASE` already established.
+    ///
+    /// Compiled out of Release, so a shipped build cannot have a session handed to
+    /// it by an environment variable.
+    private func seedSessionFromEnvironmentIfNeeded() {
+        #if DEBUG
+        let environment = ProcessInfo.processInfo.environment
+        guard let token = environment["FWB_SESSION_TOKEN"], !token.isEmpty else { return }
+        KeychainHelper.save(key: accessTokenKey, value: token, service: KeychainHelper.authService)
+        if let refresh = environment["FWB_REFRESH_TOKEN"], !refresh.isEmpty {
+            KeychainHelper.save(key: refreshTokenKey, value: refresh, service: KeychainHelper.authService)
+        }
+        #endif
+    }
+
     var baseURL: String { FWBConfig.baseURL }
     private let appId = FWBConfig.appId
 
     private let accessTokenKey  = "fwb.accessToken"
     private let refreshTokenKey = "fwb.refreshToken"
+
+    private init() {
+        seedSessionFromEnvironmentIfNeeded()
+    }
 
     // MARK: - Token storage (Keychain-backed)
 
