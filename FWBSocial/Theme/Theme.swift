@@ -21,18 +21,20 @@ import SwiftUI
 
 enum Theme {
 
-    // MARK: Brand color seeds (PLACEHOLDER)
+    // MARK: Brand color seeds
     //
-    // A warm coral→amber pair — a stand-in "social, warm, in-person" identity,
-    // distinct from Cove's cool violet (chat is a DIFFERENT product surface
-    // here, not the whole app — PLAN.md §0's two-content-surfaces split).
+    // Jade greens derived from the app icon's pine-green background
+    // (ClubhouseBack.png, dominant #204038, hue ~165°) — owner directive
+    // 2026-08-10. The flat accent lives in the AccentColor asset so it can
+    // adapt per appearance (light #25735F, dark #56BFA5) and stays in sync
+    // with the system tint; deep/light bracket the same hue for gradients.
     nonisolated enum Brand {
-        /// Flat accent — used for tints, links, toggles.
-        static let base  = Color(hex: 0xFF5A5F)
+        /// Flat accent — used for tints, links, toggles. Adaptive via asset.
+        static let base  = Color("AccentColor")
         /// Gradient start / pressed state.
-        static let deep  = Color(hex: 0xD1373C)
+        static let deep  = Color(hex: 0x1B584A)
         /// Gradient end / highlights.
-        static let light = Color(hex: 0xFF8A65)
+        static let light = Color(hex: 0x63C4A9)
     }
 
     // MARK: Semantic color tokens
