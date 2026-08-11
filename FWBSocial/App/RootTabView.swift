@@ -68,22 +68,29 @@ struct RootTabView: View {
                 }
             }
 
-            // The conditional fifth slot (owner directive 2026-08-11): four tabs
-            // grouped left, one contextual action on the right — present only when
-            // the current surface registered one. `role: .search` gives it the
-            // system's separated trailing treatment; selecting it never navigates
-            // (see the onChange intercept below).
-            if let contextual = appState.contextualAction {
-                Tab(contextual.label, systemImage: contextual.systemImage,
-                    value: FWBTab.compose, role: .search) {
-                    Color.clear // never shown — selection is intercepted
+            // The fifth slot (owner directives 2026-08-11): four tabs grouped
+            // left, one contextual action on the right. The slot is ALWAYS
+            // present so the four main tabs keep identical spacing on every
+            // page — when the surface has no action, the slot renders an empty
+            // glyph and selecting it does nothing (see the intercept below).
+            // `role: .search` gives it the system's separated trailing
+            // treatment; it never presents content of its own.
+            Tab(value: FWBTab.compose, role: .search) {
+                Color.clear // never shown — selection is intercepted
+            } label: {
+                if let contextual = appState.contextualAction {
+                    Label(contextual.label, systemImage: contextual.systemImage)
+                } else {
+                    // An empty UIImage holds the slot without drawing a glyph.
+                    Label { Text("") } icon: { Image(uiImage: UIImage()) }
                 }
             }
 
         }
         .tint(Theme.Colors.brand)
         // The compose slot is an action, not a destination: fire the registered
-        // handler and snap the selection back before the empty content can render.
+        // handler (if any — the slot is a space-holding no-op otherwise) and
+        // snap the selection back before the empty content can render.
         .onChange(of: appState.selectedTab) { previous, current in
             if current == .compose {
                 appState.selectedTab = previous
