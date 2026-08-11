@@ -21,6 +21,7 @@ struct AnnouncementsFeedView: View {
     @State private var showComposer = false
     @State private var editing: Announcement?
     @State private var pendingDelete: Announcement?
+    @State private var schedulingUnpin: Announcement?
     @State private var showAuthSheet = false
     @State private var showFriendCode = false
 
@@ -72,10 +73,23 @@ struct AnnouncementsFeedView: View {
                 } else {
                     ForEach(orderedItems) { announcement in
                         NavigationLink(value: announcement.id) {
-                            AnnouncementRow(announcement: announcement)
+                            AnnouncementRow(announcement: announcement, isAdmin: auth.isAdmin)
                         }
                         .buttonStyle(.plain)
                         .contextMenu { adminMenu(for: announcement) }
+                        // The kebab is an OVERLAY on the link, never inside its
+                        // label: a control nested in a NavigationLink's label has
+                        // its taps eaten by the link, so the menu would simply
+                        // navigate instead of opening.
+                        .overlay(alignment: .topTrailing) {
+                            if auth.isAdmin {
+                                AnnouncementKebabMenu(
+                                    announcement: announcement,
+                                    handlers: handlers(for: announcement))
+                                .padding(.trailing, Theme.Spacing.xs)
+                                .padding(.top, Theme.Spacing.xs)
+                            }
+                        }
                         .task {
                             let includeDrafts = auth.isAdmin
                             await loader.loadMoreIfNeeded(current: announcement) { page, per in
@@ -137,6 +151,19 @@ struct AnnouncementsFeedView: View {
             AnnouncementComposerView(existing: announcement) { Task { await reload() } }
         }
         .sheet(isPresented: $showAuthSheet) { AuthFlowView() }
+        .sheet(item: $schedulingUnpin) { announcement in
+            // A writing sheet, so NOT DismissableSheet: it carries Cancel and
+            // "Schedule" rather than a Done that would have already happened.
+            UnpinDateSheet(announcement: announcement) { date in
+                AnnouncementActions(toasts: toasts).setPin(
+                    announcement,
+                    pinned: true,
+                    until: date,
+                    clearSchedule: date == nil
+                ) { _ in Task { await reload() } }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .sheet(isPresented: $showFriendCode) {
             // Compact on purpose: it is a code, two buttons and a sentence, and a
             // full-height sheet for that reads as a screen the member has to get
@@ -208,80 +235,35 @@ struct AnnouncementsFeedView: View {
 
     // MARK: Admin
 
+    /// The long press. Same items as the kebab because it is the same view —
+    /// `AnnouncementMenuItems` is the single definition, so the two surfaces
+    /// cannot drift apart.
     @ViewBuilder
     private func adminMenu(for announcement: Announcement) -> some View {
         if auth.isAdmin {
-            Button {
-                editing = announcement
-            } label: {
-                Label("Edit", systemImage: "pencil")
-            }
-            if announcement.isPublished {
-                Button {
-                    unpublish(announcement)
-                } label: {
-                    Label("Move to draft", systemImage: "tray.and.arrow.down")
-                }
-            } else {
-                Button {
-                    publish(announcement)
-                } label: {
-                    Label("Publish", systemImage: "paperplane")
-                }
-            }
-            Button(role: .destructive) {
-                pendingDelete = announcement
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
+            AnnouncementMenuItems(announcement: announcement, handlers: handlers(for: announcement))
         }
     }
 
-    private func publish(_ announcement: Announcement) {
-        Task {
-            do {
-                let result = try await APIClient.shared.publishAnnouncement(id: announcement.id)
-                // Report what the push actually did rather than implying
-                // delivery. Zero recipients is a normal outcome — nobody opted
-                // in, APNs unconfigured, everyone toggled it off — and an admin
-                // told only "published" has been misled.
-                if result.pushSkippedAlreadySent == true {
-                    toasts.success("Published — members were already notified")
-                } else if let delivered = result.pushDelivered {
-                    toasts.success("Published — notified \(delivered) device\(delivered == 1 ? "" : "s")")
-                } else {
-                    toasts.success("Published")
-                }
-                await reload()
-            } catch {
-                toasts.error(error.fwbMessage)
-            }
-        }
-    }
-
-    private func unpublish(_ announcement: Announcement) {
-        Task {
-            do {
-                _ = try await APIClient.shared.unpublishAnnouncement(id: announcement.id)
-                toasts.success("Moved back to draft")
-                await reload()
-            } catch {
-                toasts.error(error.fwbMessage)
-            }
-        }
+    private func handlers(for announcement: Announcement) -> AnnouncementMenuHandlers {
+        let actions = AnnouncementActions(toasts: toasts)
+        // The feed refetches rather than patching the row in place: pinning
+        // REORDERS this list, and a row that changed its own pin state without
+        // moving would be the wrong answer on screen.
+        let reloadAfter: (Announcement?) -> Void = { _ in Task { await reload() } }
+        return AnnouncementMenuHandlers(
+            edit: { editing = announcement },
+            publish: { actions.publish(announcement, onDone: reloadAfter) },
+            unpublish: { actions.unpublish(announcement, onDone: reloadAfter) },
+            pin: { actions.setPin(announcement, pinned: true, onDone: reloadAfter) },
+            unpin: { actions.setPin(announcement, pinned: false, onDone: reloadAfter) },
+            scheduleUnpin: { schedulingUnpin = announcement },
+            confirmDelete: { pendingDelete = announcement })
     }
 
     private func delete(_ announcement: Announcement) {
         pendingDelete = nil
-        Task {
-            do {
-                try await APIClient.shared.deleteAnnouncement(id: announcement.id)
-                toasts.success("Deleted")
-                await reload()
-            } catch {
-                toasts.error(error.fwbMessage)
-            }
-        }
+        AnnouncementActions(toasts: toasts).delete(announcement) { Task { await reload() } }
     }
 
     private func reload() async {
