@@ -52,16 +52,60 @@ enum FWBDate {
 
 // MARK: - Pagination
 
-/// Standard paged envelope: `{ items: [...], metadata: { page, per, total } }`.
+/// Standard paged envelope: `{ items: [...], metadata: { page, per, total } }` —
+/// Vapor's `Fluent.Page` shape, which is what `.paginate()` emits.
+///
+/// **Decodes tolerantly on purpose.** A cacheable, unauthenticated collection
+/// route is often written to return a bare JSON array (it ETags better and the
+/// envelope buys nothing when there's no cursor), and `/api/public/announcements`
+/// is exactly that kind of route — PLAN.md §4.1 specifies the caching, not the
+/// envelope. Accepting `{items:…}`, `{data:…}` and `[…]` means a reasonable
+/// server-side choice can't turn into a client outage. A bare array is treated
+/// as a complete, unpaginated page.
 nonisolated struct PagedResponse<T: Decodable & Sendable>: Decodable, Sendable {
     let items: [T]
     let metadata: PageMetadata?
+
+    init(items: [T], metadata: PageMetadata? = nil) {
+        self.items = items
+        self.metadata = metadata
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case items, metadata, data, results, meta, pagination
+    }
+
+    init(from decoder: Decoder) throws {
+        // Bare array first — it has no keys to inspect.
+        if let single = try? decoder.singleValueContainer(),
+           let array = try? single.decode([T].self) {
+            self.items = array
+            self.metadata = nil
+            return
+        }
+
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let array = try container.decodeIfPresent([T].self, forKey: .items) {
+            self.items = array
+        } else if let array = try container.decodeIfPresent([T].self, forKey: .data) {
+            self.items = array
+        } else if let array = try container.decodeIfPresent([T].self, forKey: .results) {
+            self.items = array
+        } else {
+            self.items = []
+        }
+
+        self.metadata = (try? container.decodeIfPresent(PageMetadata.self, forKey: .metadata))
+            ?? (try? container.decodeIfPresent(PageMetadata.self, forKey: .meta))
+            ?? (try? container.decodeIfPresent(PageMetadata.self, forKey: .pagination))
+            ?? nil
+    }
 }
 
 nonisolated struct PageMetadata: Decodable, Sendable {
-    let page: Int
-    let per: Int
-    let total: Int
+    let page: Int?
+    let per: Int?
+    let total: Int?
 }
 
 // MARK: - Trivial response shapes
