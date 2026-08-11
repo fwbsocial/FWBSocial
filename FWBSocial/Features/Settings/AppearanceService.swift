@@ -29,9 +29,14 @@ final class AppearanceService {
         case system, light, dark
         var id: String { rawValue }
         var label: String { rawValue.capitalized }
-        var colorScheme: ColorScheme? {
+
+        /// The UIKit style this maps to. `.unspecified` — not "no opinion, keep
+        /// what you had" — is what makes "System" genuinely revert. See
+        /// `applyToWindows()` for why this is the interface rather than
+        /// `ColorScheme?`.
+        var uiStyle: UIUserInterfaceStyle {
             switch self {
-            case .system: return nil
+            case .system: return .unspecified
             case .light:  return .light
             case .dark:   return .dark
             }
@@ -135,5 +140,75 @@ final class AppearanceService {
             logger.error("Failed to set alternate icon: \(error.localizedDescription)")
             throw error
         }
+    }
+
+    // MARK: - Applying the appearance
+    //
+    // House standard, `feedback_appearance_switch_window_override`: the override
+    // goes on the WINDOW, never on a view.
+    //
+    // `.preferredColorScheme(theme.colorScheme)` at the app root — which is what
+    // this app shipped with — has a one-way bug that Bobak has had to have fixed
+    // in "just about every app". SwiftUI reads `nil` as "this view expresses no
+    // preference", not as "revert to the system", so an ALREADY-PRESENTED sheet
+    // keeps whatever explicit scheme it was given. Switching Light → Dark
+    // restyles the open Settings sheet; switching Dark → System leaves it dark
+    // until it is closed and reopened. The sheet hosting the picker is, of
+    // course, the one surface the member is looking at while they use it.
+    //
+    // `UIWindow.overrideUserInterfaceStyle = .unspecified` genuinely reverts,
+    // and it sits above the whole presentation stack — sheets, full-screen
+    // covers and alerts are all presented within the same window, so they
+    // inherit it live with no per-view plumbing at all.
+
+    /// Push the current theme onto every window in the app.
+    ///
+    /// `animated` cross-dissolves the change, which is what the system itself
+    /// does when the real setting flips; an instant swap of every colour on
+    /// screen reads as a glitch.
+    func applyToWindows(animated: Bool = false) {
+        let style = theme.uiStyle
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows where window.overrideUserInterfaceStyle != style {
+                guard animated else {
+                    window.overrideUserInterfaceStyle = style
+                    continue
+                }
+                UIView.transition(with: window, duration: 0.22, options: .transitionCrossDissolve) {
+                    window.overrideUserInterfaceStyle = style
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Root modifier
+
+private struct AppearanceWindowOverride: ViewModifier {
+    @State private var appearance = AppearanceService.shared
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { appearance.applyToWindows() }
+            .onChange(of: appearance.theme) { _, _ in
+                appearance.applyToWindows(animated: true)
+            }
+            // Windows are created after this view appears, and go on being
+            // created for the app's whole life — an alert or an action sheet
+            // brings up its own. Each one arrives at the system style, so
+            // without this it would ignore the member's choice.
+            .onReceive(NotificationCenter.default.publisher(for: UIWindow.didBecomeVisibleNotification)) { _ in
+                appearance.applyToWindows()
+            }
+    }
+}
+
+extension View {
+    /// Applies the member's light/dark/system choice at the window level, live,
+    /// in both directions, including over already-presented sheets. Attach once,
+    /// at the app's root.
+    func fwbAppearanceOverride() -> some View {
+        modifier(AppearanceWindowOverride())
     }
 }

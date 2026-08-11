@@ -33,7 +33,10 @@ struct FWBSocialApp: App {
                 .environment(auth)
                 .environment(onboarding)
                 .fwbToastOverlay(toasts)
-                .preferredColorScheme(appearance.theme.colorScheme)
+                // NOT `.preferredColorScheme` — see `fwbAppearanceOverride()`.
+                // The override is applied to the window so it reaches sheets
+                // that are already open, and so "System" actually reverts.
+                .fwbAppearanceOverride()
                 .fullScreenCover(isPresented: .constant(isPresentingOnboarding)) {
                     OnboardingGateView()
                         .environment(auth)
