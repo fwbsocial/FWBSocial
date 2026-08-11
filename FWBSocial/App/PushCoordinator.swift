@@ -17,6 +17,9 @@ private let pushLog = Logger(subsystem: "events.fwb.social", category: "Push")
 
 enum PendingPush: Sendable, Equatable {
     case tab(FWBTab)
+    /// An announcement push carries `announcement_id`; tapping it opens that
+    /// announcement's detail screen, not just the Home tab (PLAN.md §4.1).
+    case announcement(id: String)
 }
 
 extension Notification.Name {
@@ -81,7 +84,10 @@ final class PushCoordinator {
         guard token != registeredToken else { return }
         Task {
             do {
-                try await APIClient.shared.registerPushDevice(token: token, appIdentifier: appIdentifier)
+                try await APIClient.shared.registerPushDevice(
+                    token: token,
+                    bundleId: appIdentifier,
+                    environment: FWBConfig.apnsEnvironment)
                 registeredToken = token
                 pushLog.debug("Registered device token with backend")
             } catch {
@@ -97,17 +103,16 @@ final class PushCoordinator {
     func unregister() {
         guard let token = cachedToken ?? registeredToken else { return }
         guard let bearer = APIClient.shared.accessToken else { registeredToken = nil; return }
-        let appId = appIdentifier
         let baseURL = APIClient.shared.baseURL
         registeredToken = nil
         Task {
-            struct Body: Encodable { let token: String; let appIdentifier: String }
-            var req = URLRequest(url: URL(string: baseURL + "/api/push/unregister-device")!)
+            struct Body: Encodable { let token: String }
+            var req = URLRequest(url: URL(string: baseURL + "/api/push/devices")!)
             req.httpMethod = "DELETE"
             req.setValue(FWBConfig.appId, forHTTPHeaderField: "X-App-Id")
             req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            req.httpBody = try? FWBJSON.encoder.encode(Body(token: token, appIdentifier: appId))
+            req.httpBody = try? FWBJSON.encoder.encode(Body(token: token))
             req.timeoutInterval = 15
             _ = try? await URLSession.shared.data(for: req)
         }
@@ -115,22 +120,35 @@ final class PushCoordinator {
 
     // MARK: Routing
 
-    /// Decide where a tapped notification should take the user, by category.
-    /// Placeholder mapping — real categories (`fwb_chat_message`,
-    /// `fwb_channel_post`, `fwb_announcement`, `fwb_friend_request`, …) land
-    /// with their features.
-    func route(category: String) {
+    /// Decide where a tapped notification should take the user.
+    ///
+    /// `userInfo` values are flattened onto the APS payload by the server's
+    /// `PushService.Payload` — the client reads `userInfo["announcement_id"]`
+    /// directly, not nested under an `extra` key.
+    ///
+    /// Category-only routing is the fallback: an announcement push that carries
+    /// an id opens that announcement; one that doesn't still lands on Home.
+    /// Chat and channel categories are placeholders until those features exist.
+    func route(category: String, userInfo: [String: String] = [:]) {
         switch category {
+        case "fwb_announcement":
+            if let id = userInfo["announcement_id"], !id.isEmpty {
+                enqueue(.announcement(id: id))
+            } else {
+                enqueue(.tab(.home))
+            }
         case "fwb_chat_message":
             enqueue(.tab(.chat))
         case "fwb_channel_post":
             enqueue(.tab(.channels))
-        case "fwb_announcement":
-            enqueue(.tab(.home))
         case "fwb_friend_request":
             enqueue(.tab(.profile))
         default:
-            break
+            // A push with no category but an announcement id is still routable —
+            // the payload is what matters, the category is just a hint.
+            if let id = userInfo["announcement_id"], !id.isEmpty {
+                enqueue(.announcement(id: id))
+            }
         }
     }
 
@@ -148,6 +166,8 @@ final class PushCoordinator {
         switch p {
         case .tab(let tab):
             appState.selectedTab = tab
+        case .announcement(let id):
+            appState.openAnnouncement(id: id)
         }
     }
 }
@@ -208,9 +228,19 @@ final class FWBAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
-        let category = response.notification.request.content.categoryIdentifier
+        let content = response.notification.request.content
+        let category = content.categoryIdentifier
+        // `userInfo` is `[AnyHashable: Any]` and not Sendable, so it is flattened
+        // to the string pairs we actually route on BEFORE hopping to the
+        // MainActor — carrying the dictionary across would not compile under
+        // strict concurrency, and shouldn't.
+        let info: [String: String] = content.userInfo.reduce(into: [:]) { result, pair in
+            if let key = pair.key as? String, let value = pair.value as? String {
+                result[key] = value
+            }
+        }
         Task { @MainActor in
-            PushCoordinator.shared.route(category: category)
+            PushCoordinator.shared.route(category: category, userInfo: info)
         }
         completionHandler()
     }

@@ -9,6 +9,7 @@ import SwiftUI
 struct SettingsView: View {
     @State private var appearance = AppearanceService.shared
     @State private var auth = AuthService.shared
+    @State private var onboarding = OnboardingService.shared
 
     var body: some View {
         Form {
@@ -35,13 +36,17 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Account (placeholder)
+    // MARK: - Account
+    //
+    // Account *management* (edit, sign out, delete) lives on the Profile tab —
+    // this is a read-only pointer so both surfaces don't own the same actions.
 
     private var accountSection: some View {
         Section("Account") {
             if let user = auth.user {
                 LabeledContent("Name", value: user.displayName)
                 LabeledContent("Email", value: user.email)
+                LabeledContent("Membership", value: user.vettingLabel)
             } else {
                 Text("Not signed in").foregroundStyle(.secondary)
             }
@@ -51,8 +56,28 @@ struct SettingsView: View {
     // MARK: - About
 
     private var aboutSection: some View {
-        Section("About") {
+        Section {
             LabeledContent("Version", value: appVersion)
+            Link(destination: URL(string: "mailto:\(FWBConfig.supportEmail)")!) {
+                LabeledContent("Support", value: FWBConfig.supportEmail)
+            }
+            Link("Terms of use", destination: FWBConfig.termsURL)
+            Link("Privacy policy", destination: FWBConfig.privacyURL)
+            Link("Community guidelines", destination: FWBConfig.guidelinesURL)
+
+            if onboarding.isRunningOnLocalRecordOnly && auth.isSignedIn {
+                // Deliberately visible rather than swallowed. "The server has no
+                // record of your terms acceptance" is exactly the kind of thing
+                // that should not be a silent local-only state.
+                Label("Your terms acceptance is stored on this device and hasn't reached the server yet.",
+                      systemImage: "exclamationmark.icloud")
+                    .font(Theme.Typography.caption)
+                    .foregroundStyle(Theme.Colors.caution)
+            }
+        } header: {
+            Text("About")
+        } footer: {
+            Text("fwb social")
         }
     }
 
