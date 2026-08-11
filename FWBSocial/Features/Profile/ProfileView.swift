@@ -168,22 +168,6 @@ struct ProfileView: View {
                 NotificationPreferencesSection()
 
                 Section {
-                    // R2 is not provisioned yet (PLAN.md Phase 0), so the upload
-                    // endpoint has nowhere to put the bytes. The control is left out
-                    // rather than shipped broken.
-                    Label {
-                        Text("Photo uploads aren't switched on yet.")
-                    } icon: {
-                        Image(systemName: "photo.badge.plus")
-                    }
-                    .font(Theme.Typography.preview)
-                    .foregroundStyle(.secondary)
-                } header: {
-                    Text("Avatar")
-                        .fwbOnCanvas()
-                }
-
-                Section {
                     Link(destination: URL(string: "mailto:\(FWBConfig.supportEmail)")!) {
                         LabeledContent("Contact us", value: FWBConfig.supportEmail)
                     }
@@ -366,71 +350,8 @@ struct NotificationPreferencesSection: View {
     }
 }
 
-// MARK: - Edit profile
-
-struct EditProfileView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(ToastCenter.self) private var toasts
-
-    @State private var displayName = ""
-    @State private var bio = ""
-    @State private var isSaving = false
-    @State private var errorMessage: String?
-
-    private var canSave: Bool {
-        !displayName.trimmed.isEmpty && displayName.trimmed.count <= 50 && !isSaving
-    }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("Display name") {
-                    TextField("Your name", text: $displayName)
-                        .textInputAutocapitalization(.words)
-                }
-                Section("Bio") {
-                    TextField("A line about you", text: $bio, axis: .vertical)
-                        .lineLimit(3...6)
-                }
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(Theme.Colors.danger) }
-                }
-            }
-            .navigationTitle("Edit profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }.disabled(!canSave)
-                }
-            }
-            .onAppear {
-                displayName = AuthService.shared.user?.displayName ?? ""
-                bio = AuthService.shared.user?.bio ?? ""
-            }
-        }
-    }
-
-    private func save() {
-        guard canSave else { return }
-        isSaving = true
-        errorMessage = nil
-        Task {
-            do {
-                try await AuthService.shared.updateProfile(
-                    AuthService.ProfileUpdate(displayName: displayName.trimmed,
-                                              bio: bio.trimmed.isEmpty ? nil : bio.trimmed))
-                toasts.success("Profile updated")
-                dismiss()
-            } catch {
-                errorMessage = error.fwbMessage
-            }
-            isSaving = false
-        }
-    }
-}
+// `EditProfileView` — photo, display name, username, bio — lives in its own
+// file (`EditProfileView.swift`).
 
 #Preview {
     NavigationStack { ProfileView() }
