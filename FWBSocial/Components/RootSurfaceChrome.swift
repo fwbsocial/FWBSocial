@@ -59,6 +59,10 @@ private struct RootSurfaceChrome: ViewModifier {
                             AvatarView(name: user.displayName, url: user.avatarUrl)
                                 .frame(width: 30, height: 30)
                         }
+                        // The system wraps toolbar items in a glass CAPSULE, which
+                        // reads as a pill around a circular avatar (owner report).
+                        // A circular border shape makes the backing match the face.
+                        .buttonBorderShape(.circle)
                         .accessibilityLabel("Your profile")
                         .accessibilityIdentifier("chrome.profile")
                     }
