@@ -107,23 +107,65 @@ struct AnnouncementKebabMenu: View {
     let announcement: Announcement
     let handlers: AnnouncementMenuHandlers
 
+    /// Where this kebab is drawn — which decides who supplies its tap target.
+    ///
+    /// **Standing design rule, owner 2026-08-11: a glyph-only chrome button is a
+    /// CIRCLE, never an oval or a capsule.** The system's backing pads a lone
+    /// glyph horizontally, so the shape is decided by how wide the *content* is,
+    /// and this control had one 44pt-wide definition used in two places:
+    ///
+    ///  * on a card it needed that width, because nothing else was giving a 17pt
+    ///    glyph a 44pt target;
+    ///  * in a toolbar the bar already supplies the target AND the padding, so
+    ///    44pt of content came out ~60×44 — the reported oval.
+    ///
+    /// One shape cannot be right in both, so the placement says which.
+    enum Placement {
+        /// Overlaid on a feed card. Bare glyph, no backing, its own 44pt circular
+        /// target.
+        case card
+        /// A `ToolbarItem`. The bar draws the bubble; the glyph stays glyph-sized
+        /// so that bubble comes out round, like the gear beside it.
+        case toolbar
+    }
+
+    var placement: Placement = .card
+
     var body: some View {
         Menu {
             AnnouncementMenuItems(announcement: announcement, handlers: handlers)
         } label: {
-            Image(systemName: "ellipsis")
-                .font(Theme.Typography.rowTitle)
-                .foregroundStyle(.secondary)
-                // An SF Symbol contributes nothing to VoiceOver on its own, and
-                // "ellipsis" is not what this does.
-                .accessibilityLabel("Announcement actions")
-                .accessibilityHint("Publish, edit, pin, share or delete")
-                // A glyph is a ~17pt target; the tap area has to be a control's.
-                .frame(width: 44, height: 44)
-                .contentShape(.rect)
+            label
         }
         .menuOrder(.fixed)
+        // Belt and braces for the toolbar bubble: the border shape alone could
+        // not un-pill the 46pt avatar (see `RootSurfaceChrome`), but on
+        // glyph-sized content it is exactly the right instruction.
+        .buttonBorderShape(.circle)
         .accessibilityIdentifier("announcement.kebab")
+    }
+
+    @ViewBuilder
+    private var label: some View {
+        let glyph = Image(systemName: "ellipsis")
+            .font(Theme.Typography.rowTitle)
+            .foregroundStyle(.secondary)
+            // An SF Symbol contributes nothing to VoiceOver on its own, and
+            // "ellipsis" is not what this does.
+            .accessibilityLabel("Announcement actions")
+            .accessibilityHint("Publish, edit, pin, share or delete")
+
+        switch placement {
+        case .card:
+            // Equal dimensions and a CIRCULAR content shape: the frame is the
+            // 44pt target, and the hit area is the circle inscribed in it rather
+            // than a rectangle whose corners overlap the card's own tap area.
+            glyph
+                .frame(width: 44, height: 44)
+                .contentShape(.circle)
+        case .toolbar:
+            glyph
+        }
     }
 }
 
