@@ -172,8 +172,25 @@ final class ScreenshotCaptureTests: XCTestCase {
             let adaRow = app.buttons["chat.new.friend.\(Self.adaUserId)"].firstMatch
             XCTAssertTrue(adaRow.waitForExistence(timeout: timeout),
                           "Ada should be listed as a friend. Tree:\n\(app.debugDescription)")
-            adaRow.tap()
-            app.buttons["chat.new.start"].tap()
+
+            // Aim at the NAME, not the row's centre.
+            //
+            // The row is a `.buttonStyle(.plain)` Button whose label is an HStack
+            // with a `Spacer()` in the middle and no `.contentShape(Rectangle())`,
+            // so the centre of the row is a hit-testing hole. A centred `tap()`
+            // lands in it, `selected` stays empty, Start stays disabled — and the
+            // run then fails 40 seconds later on "the thread should open", which
+            // reads as a chat bug rather than a missed tap. This is a real
+            // app-side finding, not just a test detail.
+            let start = app.buttons["chat.new.start"]
+            for offset in [0.15, 0.30, 0.05] where !start.isEnabled {
+                adaRow.coordinate(withNormalizedOffset: CGVector(dx: offset, dy: 0.5)).tap()
+                _ = start.waitForExistence(timeout: 2)
+                settle(1)
+            }
+            XCTAssertTrue(start.isEnabled,
+                          "selecting a friend should enable Start. Tree:\n\(app.debugDescription)")
+            start.tap()
         } else {
             existing.tap()
         }

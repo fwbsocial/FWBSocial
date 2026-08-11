@@ -122,6 +122,13 @@ struct NewConversationView: View {
             }
         }
         .buttonStyle(.plain)
+        // The label is an HStack with a `Spacer()` in it, and a `.plain` button
+        // only takes hits on its actual content — so the whole middle of the row,
+        // which is the biggest and most obvious place to aim, was a hole. Tapping
+        // there selected nobody and left Start disabled, which reads as the button
+        // being broken rather than as the tap having missed. Found by a UI test
+        // whose centred tap landed in the gap.
+        .contentShape(Rectangle())
         .foregroundStyle(unreachable.contains(friend.userId) ? Color.secondary : Color.primary)
         // Group selection was carried entirely by a checkmark glyph, so VoiceOver
         // read a picked and an unpicked friend identically — with no way to check
