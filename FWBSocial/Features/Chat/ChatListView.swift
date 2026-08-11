@@ -53,61 +53,72 @@ struct ChatListView: View {
 
     private var list: some View {
         List {
-            // A refresh that failed over a list that already has content: one line,
-            // not a takeover. The conversations on screen are still real.
-            if let failure = chat.conversationsError {
-                Section {
-                    InlineErrorRow(message: failure.fwbMessage) {
-                        Task { await chat.refreshConversations() }
-                    }
-                }
-            }
-
-            if !chat.pendingDevices.isEmpty {
-                Section {
-                    NavigationLink {
-                        DeviceManagementView()
-                    } label: {
-                        Label {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("\(chat.pendingDevices.count) device waiting for approval")
-                                    .font(Theme.Typography.rowTitle)
-                                Text("Approve it from here to give it your history.")
-                                    .font(Theme.Typography.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: "iphone.badge.exclamationmark")
-                                .foregroundStyle(Theme.Colors.caution)
+            Group {
+                // A refresh that failed over a list that already has content: one line,
+                // not a takeover. The conversations on screen are still real.
+                if let failure = chat.conversationsError {
+                    Section {
+                        InlineErrorRow(message: failure.fwbMessage) {
+                            Task { await chat.refreshConversations() }
                         }
                     }
-                    .accessibilityIdentifier("chat.pendingDevices")
                 }
-            }
 
-            if !OfflineQueueService.shared.isOnline || OfflineQueueService.shared.queuedCount > 0 {
-                Section {
-                    Label(
-                        OfflineQueueService.shared.isOnline
-                            ? "\(OfflineQueueService.shared.queuedCount) message waiting to send"
-                            : "You're offline — messages will send when you're back",
-                        systemImage: OfflineQueueService.shared.isOnline ? "arrow.up.circle" : "wifi.slash"
-                    )
-                    .font(Theme.Typography.caption)
-                    .foregroundStyle(.secondary)
-                }
-            }
-
-            Section {
-                ForEach(chat.conversations) { conversation in
-                    NavigationLink {
-                        ChatThreadView(conversationId: conversation.id)
-                    } label: {
-                        ConversationRow(conversation: conversation)
+                if !chat.pendingDevices.isEmpty {
+                    Section {
+                        NavigationLink {
+                            DeviceManagementView()
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("\(chat.pendingDevices.count) device waiting for approval")
+                                        .font(Theme.Typography.rowTitle)
+                                    Text("Approve it from here to give it your history.")
+                                        .font(Theme.Typography.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            } icon: {
+                                Image(systemName: "iphone.badge.exclamationmark")
+                                    .foregroundStyle(Theme.Colors.caution)
+                            }
+                        }
+                        .accessibilityIdentifier("chat.pendingDevices")
                     }
-                    .accessibilityIdentifier("chat.conversation.\(conversation.id.uuidString)")
+                }
+
+                if !OfflineQueueService.shared.isOnline || OfflineQueueService.shared.queuedCount > 0 {
+                    Section {
+                        Label(
+                            OfflineQueueService.shared.isOnline
+                                ? "\(OfflineQueueService.shared.queuedCount) message waiting to send"
+                                : "You're offline — messages will send when you're back",
+                            systemImage: OfflineQueueService.shared.isOnline ? "arrow.up.circle" : "wifi.slash"
+                        )
+                        .font(Theme.Typography.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section {
+                    ForEach(chat.conversations) { conversation in
+                        NavigationLink {
+                            // The same surface `RootTabView`'s `navigationDestination`
+                            // gives a thread opened from a push. A thread opened from
+                            // this row is a different push site and needs its own.
+                            ChatThreadView(conversationId: conversation.id)
+                                .fwbAppThemeSurface()
+                        } label: {
+                            ConversationRow(conversation: conversation)
+                        }
+                        .accessibilityIdentifier("chat.conversation.\(conversation.id.uuidString)")
+                    }
                 }
             }
+            // A plain list draws an opaque `systemBackground` behind every
+            // row — which is why the conversation list was a black band across
+            // the painting. The empty and error rows opt back out with their
+            // own `.listRowBackground(.clear)`, which is closer and still wins.
+            .fwbThemedRows()
         }
         .listStyle(.plain)
     }

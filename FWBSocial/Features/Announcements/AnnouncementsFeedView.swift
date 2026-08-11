@@ -97,6 +97,11 @@ struct AnnouncementsFeedView: View {
         .navigationTitle("fwb social")
         .navigationDestination(for: String.self) { id in
             AnnouncementDetailView(announcementId: id, preloaded: loader.items.first { $0.id == id })
+                // A pushed destination is a SIBLING of this screen in the stack,
+                // not a child — the surface applied to the tab root never reaches
+                // it, and without this the announcement opened on the system's
+                // plain background with no theme on it at all.
+                .fwbAppThemeSurface()
         }
         // The compose affordance moved to the floating action button (owner
         // navigation directive) — the trailing corner is the gear now.

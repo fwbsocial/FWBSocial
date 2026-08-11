@@ -59,30 +59,40 @@ struct ChannelsView: View {
 
     private var list: some View {
         List {
-            // Only over content — an empty list with an error takes the whole
-            // surface above, where the retry lives.
-            if let loadError {
-                Section { InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } } }
-            }
-
-            ForEach(channels) { channel in
-                NavigationLink {
-                    ChannelFeedView(channel: channel)
-                } label: {
-                    ChannelRow(channel: channel)
+            Group {
+                // Only over content — an empty list with an error takes the whole
+                // surface above, where the retry lives.
+                if let loadError {
+                    Section { InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } } }
                 }
-                .accessibilityIdentifier("channel.\(channel.slug)")
-            }
 
-            if isLoading && channels.isEmpty {
-                Section {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
+                ForEach(channels) { channel in
+                    NavigationLink {
+                        ChannelFeedView(channel: channel)
+                            .fwbAppThemeSurface()
+                    } label: {
+                        ChannelRow(channel: channel)
+                    }
+                    .accessibilityIdentifier("channel.\(channel.slug)")
+                }
+
+                if isLoading && channels.isEmpty {
+                    Section {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
                     }
                 }
             }
+            // An inset-grouped list draws an opaque `secondarySystemGroupedBackground`
+            // per row — a system-grey card on top of the theme's own backdrop. This
+            // is the same trait the two Form screens already set and this list
+            // simply never did; without it, Channels was the one signed-in surface
+            // where light Clubhouse had no white boxes on it. The `Group` is what
+            // makes a per-ROW trait reach every row from one line.
+            .fwbThemedRows()
         }
         .listStyle(.insetGrouped)
     }

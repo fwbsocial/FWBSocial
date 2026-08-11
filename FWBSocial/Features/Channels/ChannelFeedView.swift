@@ -42,56 +42,64 @@ struct ChannelFeedView: View {
 
     var body: some View {
         List {
-            // Only over content. With an empty feed the failure takes the whole
-            // surface below, where it can carry a Try again.
-            if let error = loader.error, !visiblePosts.isEmpty {
-                Section { InlineErrorRow(message: error) { Task { await reload() } } }
-            }
-
-            if !pinned.isEmpty {
-                Section {
-                    ForEach(pinned) { post in row(post) }
-                } header: {
-                    Label("Pinned", systemImage: "pin.fill")
-                }
-            }
-
-            Section {
-                ForEach(unpinned) { post in
-                    row(post)
-                        .task { await loader.loadMoreIfNeeded(current: post, fetch) }
+            Group {
+                // Only over content. With an empty feed the failure takes the whole
+                // surface below, where it can carry a Try again.
+                if let error = loader.error, !visiblePosts.isEmpty {
+                    Section { InlineErrorRow(message: error) { Task { await reload() } } }
                 }
 
-                if loader.isLoading {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                        Spacer()
+                if !pinned.isEmpty {
+                    Section {
+                        ForEach(pinned) { post in row(post) }
+                    } header: {
+                        Label("Pinned", systemImage: "pin.fill")
                     }
                 }
-            }
 
-            if visiblePosts.isEmpty && !loader.isLoading && hasLoaded {
                 Section {
-                    if let failure = loader.failure {
-                        // "Start the first thread" over a failed fetch invites the
-                        // member to write a post into a channel the app cannot
-                        // currently read — and the composer would fail too.
-                        ErrorStateView(error: failure) { Task { await reload() } }
+                    ForEach(unpinned) { post in
+                        row(post)
+                            .task { await loader.loadMoreIfNeeded(current: post, fetch) }
+                    }
+
+                    if loader.isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    }
+                }
+
+                if visiblePosts.isEmpty && !loader.isLoading && hasLoaded {
+                    Section {
+                        if let failure = loader.failure {
+                            // "Start the first thread" over a failed fetch invites the
+                            // member to write a post into a channel the app cannot
+                            // currently read — and the composer would fail too.
+                            ErrorStateView(error: failure) { Task { await reload() } }
+                                .listRowBackground(Color.clear)
+                        } else {
+                            EmptyStateView(
+                                icon: "text.bubble",
+                                title: current.mayPost ? "Start the first thread" : "Nothing here yet",
+                                message: current.mayPost
+                                    ? "Be the first to post in \(current.displayName)."
+                                    : "Posts in this channel will show up here.",
+                                actionTitle: current.mayPost ? "New post" : nil,
+                                action: current.mayPost ? { isComposing = true } : nil)
                             .listRowBackground(Color.clear)
-                    } else {
-                        EmptyStateView(
-                            icon: "text.bubble",
-                            title: current.mayPost ? "Start the first thread" : "Nothing here yet",
-                            message: current.mayPost
-                                ? "Be the first to post in \(current.displayName)."
-                                : "Posts in this channel will show up here.",
-                            actionTitle: current.mayPost ? "New post" : nil,
-                            action: current.mayPost ? { isComposing = true } : nil)
-                        .listRowBackground(Color.clear)
+                        }
                     }
                 }
             }
+            // A plain list draws an opaque `systemBackground` behind every
+            // row, which covered the backdrop completely — the channel feed
+            // was a black sheet with the painting showing only in the strip
+            // under the navigation bar. The empty and error rows keep their own
+            // `.listRowBackground(.clear)`: those belong ON the canvas.
+            .fwbThemedRows()
         }
         .listStyle(.plain)
         .navigationTitle(current.displayName)
@@ -148,6 +156,9 @@ struct ChannelFeedView: View {
             // wrapper around it. That keeps the byline tappable.
             NavigationLink {
                 PostDetailView(postId: post.id, channel: current)
+                    // A pushed destination is a sibling in the stack, so it
+                    // needs the theme's surface of its own.
+                    .fwbAppThemeSurface()
             } label: { EmptyView() }
             .opacity(0)
 

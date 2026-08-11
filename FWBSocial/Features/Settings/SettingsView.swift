@@ -63,10 +63,12 @@ struct SettingsView: View {
                 .disabled(prefs == nil)
         } header: {
             Text("Privacy")
+            .fwbOnCanvas()
         } footer: {
             // Say what it actually controls. With no member search in v1, this is
             // the only inbound-contact path from the forum.
             Text("When this is off, members who find you through your posts and comments won't see a way to send you a friend request. There is no member search in fwb social — this is the only way someone can reach you from the forum.")
+            .fwbOnCanvas()
         }
     }
 
@@ -114,11 +116,13 @@ struct SettingsView: View {
             }
         } header: {
             Text("Chat")
+            .fwbOnCanvas()
         } footer: {
             Text(
                 (InboxPolicy(rawValue: auth.user?.inboxPolicy ?? "") ?? .friendsOnly).explanation
                     + "\n\nWith previews hidden, notifications say “New message” and nothing else — the decryption that produces a preview happens on this device, so turning it off really does stop it happening."
             )
+            .fwbOnCanvas()
         }
     }
 
@@ -154,8 +158,10 @@ struct SettingsView: View {
             .disabled(prefs == nil)
         } header: {
             Text("Notifications")
+            .fwbOnCanvas()
         } footer: {
             Text("Channel notifications are throttled and grouped, and you can mute any single channel or conversation from its own screen.")
+            .fwbOnCanvas()
         }
     }
 
@@ -187,12 +193,15 @@ struct SettingsView: View {
     // MARK: - Safety
 
     private var safetySection: some View {
-        Section("Safety") {
+        Section {
             NavigationLink {
                 BlockedMembersView()
             } label: {
                 Label("Blocked members", systemImage: "hand.raised")
             }
+        } header: {
+            Text("Safety")
+                .fwbOnCanvas()
         }
     }
 
@@ -207,8 +216,10 @@ struct SettingsView: View {
             }
         } header: {
             Text("Moderation")
+            .fwbOnCanvas()
         } footer: {
             Text("Reports should be actioned within 24 hours.")
+            .fwbOnCanvas()
         }
     }
 
@@ -270,6 +281,7 @@ struct SettingsView: View {
             .accessibilityIdentifier("settings.appearanceTheme")
         } header: {
             Text("Appearance")
+            .fwbOnCanvas()
         }
 
         Section {
@@ -279,14 +291,19 @@ struct SettingsView: View {
             .accessibilityIdentifier("settings.appTheme")
         } header: {
             Text("App Theme")
+            .fwbOnCanvas()
         } footer: {
             // The selected theme's own sentence — which, for Pine, is where the
             // member finds out the appearance picker above it does not apply.
             Text(appearance.appTheme.blurb)
+            .fwbOnCanvas()
         }
 
-        Section("App Icon") {
+        Section {
             AppIconPicker()
+        } header: {
+            Text("App Icon")
+                .fwbOnCanvas()
         }
     }
 
@@ -296,7 +313,7 @@ struct SettingsView: View {
     // this is a read-only pointer so both surfaces don't own the same actions.
 
     private var accountSection: some View {
-        Section("Account") {
+        Section {
             if let user = auth.user {
                 LabeledContent("Name", value: user.displayName)
                 LabeledContent("Email", value: user.email)
@@ -304,6 +321,9 @@ struct SettingsView: View {
             } else {
                 Text("Not signed in").foregroundStyle(.secondary)
             }
+        } header: {
+            Text("Account")
+                .fwbOnCanvas()
         }
     }
 
@@ -330,8 +350,10 @@ struct SettingsView: View {
             }
         } header: {
             Text("About")
+            .fwbOnCanvas()
         } footer: {
             Text("fwb social")
+            .fwbOnCanvas()
         }
     }
 

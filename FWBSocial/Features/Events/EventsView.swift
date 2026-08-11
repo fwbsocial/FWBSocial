@@ -63,6 +63,9 @@ struct EventsView: View {
                 lumaEventId: lumaEventId,
                 eventName: windows.first { $0.lumaEventId == lumaEventId }?.eventName
             )
+            // A pushed destination is a sibling in the stack, so it needs the
+            // theme's surface of its own. See `fwbAppThemeSurface()`.
+            .fwbAppThemeSurface()
         }
         .task { await load() }
         .refreshable { await load() }

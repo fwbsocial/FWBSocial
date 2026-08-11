@@ -82,7 +82,7 @@ struct ProfileView: View {
                     Button("Edit profile") { showEditProfile = true }
                 }
 
-                Section("Membership") {
+                Section {
                     LabeledContent("Status") {
                         StatusBadge(user.vettingLabel,
                                     color: user.isVetted ? Theme.Colors.positive : Theme.Colors.caution)
@@ -149,6 +149,9 @@ struct ProfileView: View {
                             toasts.show("Friend code copied")
                         }
                     }
+                } header: {
+                    Text("Membership")
+                        .fwbOnCanvas()
                 }
 
                 if !user.emailVerified {
@@ -164,7 +167,7 @@ struct ProfileView: View {
 
                 NotificationPreferencesSection()
 
-                Section("Avatar") {
+                Section {
                     // R2 is not provisioned yet (PLAN.md Phase 0), so the upload
                     // endpoint has nowhere to put the bytes. The control is left out
                     // rather than shipped broken.
@@ -175,15 +178,21 @@ struct ProfileView: View {
                     }
                     .font(Theme.Typography.preview)
                     .foregroundStyle(.secondary)
+                } header: {
+                    Text("Avatar")
+                        .fwbOnCanvas()
                 }
 
-                Section("Support") {
+                Section {
                     Link(destination: URL(string: "mailto:\(FWBConfig.supportEmail)")!) {
                         LabeledContent("Contact us", value: FWBConfig.supportEmail)
                     }
                     Link("Community guidelines", destination: FWBConfig.guidelinesURL)
                     Link("Terms of use", destination: FWBConfig.termsURL)
                     Link("Privacy policy", destination: FWBConfig.privacyURL)
+                } header: {
+                    Text("Support")
+                        .fwbOnCanvas()
                 }
 
                 if let errorMessage {
@@ -213,6 +222,7 @@ struct ProfileView: View {
                     // drops every token; forum posts are tombstoned to "Deleted
                     // member" rather than erased.
                     Text("Deleting removes your account, revokes any Sign in with Apple grant and signs you out everywhere. Posts you've made stay, attributed to a deleted member. This can't be undone.")
+                    .fwbOnCanvas()
                 }
             }
             // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
@@ -302,8 +312,10 @@ struct NotificationPreferencesSection: View {
             }
         } header: {
             Text("Notifications")
+            .fwbOnCanvas()
         } footer: {
             Text("You'll only get notifications for features you have access to.")
+            .fwbOnCanvas()
         }
         .disabled(isSaving)
         .task { await load(force: false) }
