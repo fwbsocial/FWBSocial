@@ -235,6 +235,10 @@ struct PostComposerView: View {
                 }
 
                 HStack(spacing: Theme.Spacing.lg) {
+                    // `.borderless` on every control in this row is load-bearing:
+                    // a Form row containing plain buttons activates ALL of them on
+                    // a row tap — which presented the photo sheet and queued the
+                    // video sheet behind it from a single tap.
                     PhotosPicker(
                         selection: $photoItems,
                         maxSelectionCount: PostMediaLimits.maxPhotos,
@@ -242,11 +246,13 @@ struct PostComposerView: View {
                     ) {
                         Label("Photos", systemImage: "photo.on.rectangle")
                     }
+                    .buttonStyle(.borderless)
                     .accessibilityIdentifier("composer.photos")
 
                     PhotosPicker(selection: $videoItem, matching: .videos) {
                         Label("Video", systemImage: "video")
                     }
+                    .buttonStyle(.borderless)
                     .accessibilityIdentifier("composer.video")
 
                     if !photoPreviews.isEmpty || videoPreview != nil {
@@ -254,6 +260,7 @@ struct PostComposerView: View {
                             photoItems = []; photoPreviews = []
                             videoItem = nil; videoPreview = nil; videoDuration = nil
                         }
+                        .buttonStyle(.borderless)
                         .font(Theme.Typography.caption)
                     }
                 }

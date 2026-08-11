@@ -231,18 +231,38 @@ final class ScreenshotCaptureTests: XCTestCase {
         XCTAssertTrue(latestIncoming.waitForExistence(timeout: timeout),
                       "Mika's messages should decrypt on this device. Tree:\n\(app.debugDescription)")
 
-        for reply in Self.adaReplies where !app.staticTexts[reply].exists {
-            send(reply)
+        // Replying is OPT-IN, not inferred from what is on screen.
+        //
+        // The first version sent any reply it could not already see. That guard ran
+        // while the history was still laying out, saw none of Ada's own bubbles,
+        // and sent both again — twice, on two consecutive runs, each time leaving a
+        // visibly duplicated thread that had to be cleaned up through the API. A
+        // send is not idempotent and must not be driven by a race. Pass
+        // `FWB_SEND_REPLIES=1` on the run that is meant to write; every later
+        // capture run just photographs what is there.
+        if ProcessInfo.processInfo.environment["FWB_SEND_REPLIES"] == "1" {
+            for reply in Self.adaReplies { send(reply) }
         }
 
-        // Dismiss the keyboard so the thread, not the keyboard, is the screenshot.
-        dismissKeyboard()
-        settle(3)
+        // Leave the thread and come back rather than trying to dismiss the
+        // keyboard in place. `ChatThreadView` uses
+        // `.scrollDismissesKeyboard(.interactively)`, so there is no tap target
+        // that reliably closes it — tapping the thread opens the message action
+        // menu instead, and tapping the navigation bar does nothing. Re-entering
+        // gives an unfocused composer and a thread already scrolled to the bottom.
+        app.navigationBars.buttons["BackButton"].tap()
+        let backRow = app.cells.element(boundBy: 0)
+        XCTAssertTrue(backRow.waitForExistence(timeout: timeout), "back on the conversation list")
+        backRow.tap()
+        XCTAssertTrue(app.textFields["chat.composer"].waitForExistence(timeout: timeout),
+                      "the thread should re-open")
+        settle(4)
         // Both sides have to be visible in the frame, or this is not the shot.
         XCTAssertTrue(app.staticTexts[Self.adaReplies[Self.adaReplies.count - 1]].exists,
                       "Ada's reply should be on screen. Tree:\n\(app.debugDescription)")
         XCTAssertTrue(latestIncoming.exists, "Mika's message should still be on screen")
         XCTAssertFalse(app.buttons["Report"].exists, "no action menu should be covering the thread")
+        XCTAssertFalse(app.keyboards.element.exists, "the keyboard should be down for the capture")
         shoot("04-chat")
     }
 
