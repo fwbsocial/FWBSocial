@@ -25,11 +25,11 @@ struct EventsView: View {
 
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Spacing.xl) {
-                SectionHeader(
-                    title: "Events",
-                    subtitle: "After an event, you've got 48 hours to add the people you met.",
-                    eyebrow: "fwb social"
-                )
+                // No in-content title — the navigation bar's large title already
+                // says "Events" (they doubled up once nav titles went display-face).
+                Text("After an event, you've got 48 hours to add the people you met.")
+                    .font(Theme.Typography.preview)
+                    .foregroundStyle(.secondary)
 
                 // The Luma-email card sits ABOVE the windows on purpose: an
                 // unmatched member sees an empty Events tab and no explanation,
