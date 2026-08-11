@@ -45,6 +45,14 @@ final class PushCoordinator {
     private var cachedToken: String?
     /// Last token successfully POSTed to the backend (de-dupe guard).
     private var registeredToken: String?
+    /// A registration POST already in flight. Without this, the two callers that
+    /// legitimately fire at launch — the scene's `.task` and the `isSignedIn`
+    /// change that `restoreSession()` triggers — both read `registeredToken` as
+    /// nil before either finishes, and the same token is POSTed twice.
+    private var registrationInFlight = false
+    /// Authorization has already been requested this session. The prompt itself
+    /// is idempotent, but asking twice is two round trips for nothing.
+    private var didRequestAuthorization = false
 
     /// A route from a tapped notification awaiting the scene (see PendingPush).
     private(set) var pending: PendingPush?
@@ -55,6 +63,12 @@ final class PushCoordinator {
     /// notifications regardless of the grant (registration itself always
     /// succeeds and gives us a token; the grant only gates alert display).
     func requestAuthorizationAndRegister() {
+        guard !didRequestAuthorization else {
+            // Already asked — just make sure the backend has the token.
+            syncRegistration()
+            return
+        }
+        didRequestAuthorization = true
         Task {
             do {
                 let granted = try await UNUserNotificationCenter.current()
@@ -82,7 +96,10 @@ final class PushCoordinator {
         guard let token = cachedToken else { return }
         guard AuthService.shared.isSignedIn else { return }
         guard token != registeredToken else { return }
+        guard !registrationInFlight else { return }
+        registrationInFlight = true
         Task {
+            defer { registrationInFlight = false }
             do {
                 try await APIClient.shared.registerPushDevice(
                     token: token,
@@ -105,6 +122,7 @@ final class PushCoordinator {
         guard let bearer = APIClient.shared.accessToken else { registeredToken = nil; return }
         let baseURL = APIClient.shared.baseURL
         registeredToken = nil
+        didRequestAuthorization = false
         Task {
             struct Body: Encodable { let token: String }
             var req = URLRequest(url: URL(string: baseURL + "/api/push/devices")!)
