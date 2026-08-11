@@ -56,10 +56,26 @@ struct ChatThreadView: View {
                 isMine: chat.isMine(message),
                 onReply: { replyTo = message },
                 onReact: { emoji in Task { await chat.react(to: message.id, emoji: emoji, in: conversationId) } },
-                onDelete: { Task { try? await chat.deleteMessage(message) } },
+                // A delete that silently failed left the message on screen with no
+                // explanation, which reads as the app ignoring the tap — and on a
+                // message someone regrets sending, "it looked like it didn't work"
+                // is the wrong ambiguity to leave.
+                onDelete: {
+                    Task {
+                        do { try await chat.deleteMessage(message) }
+                        catch {
+                            guard !isCancellationError(error) else { return }
+                            errorMessage = error.fwbMessage
+                        }
+                    }
+                },
                 onReport: { reportTarget = message }
             )
-            .presentationDetents([.height(280)])
+            // 280 pt fits the menu at default sizes and hides its LAST row at
+            // accessibility sizes — and the last rows are Delete and Report, which
+            // are exactly the two a member most needs to reach. `.medium` and
+            // `.large` are offered alongside so the sheet has somewhere to grow.
+            .presentationDetents([.height(280), .medium, .large])
         }
         .sheet(item: $reportTarget) { message in
             ChatReportSheet(message: message, conversationId: conversationId)
@@ -67,7 +83,9 @@ struct ChatThreadView: View {
         .fullScreenCover(item: $mediaTarget) { message in
             ChatMediaViewer(message: message)
         }
-        .alert("Couldn't send", isPresented: .constant(errorMessage != nil)) {
+        // Carries send failures and delete failures both, so the title stays
+        // neutral; the body is the server's own sentence either way.
+        .alert("Couldn't do that", isPresented: .constant(errorMessage != nil)) {
             Button("OK") { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
@@ -115,7 +133,31 @@ struct ChatThreadView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    if chat.hasMoreByConversation[conversationId] != false {
+                    // A history fetch that failed used to leave the transcript
+                    // simply blank. On an end-to-end-encrypted app a blank
+                    // transcript does not read as "couldn't load" — it reads as
+                    // "your messages are gone", which is the most alarming thing
+                    // this app can imply and the one it can least afford to imply
+                    // by accident.
+                    if messages.isEmpty, let failure = chat.historyErrors[conversationId] {
+                        ErrorStateView(error: failure) {
+                            Task { await chat.loadMessages(conversationId) }
+                        }
+                        .padding(.top, Theme.Spacing.xxl)
+                    } else if messages.isEmpty, chat.hasMoreByConversation[conversationId] == false {
+                        EmptyStateView(
+                            icon: "lock.shield",
+                            title: "No messages yet",
+                            message: "Say something. Everything in this thread is end-to-end encrypted — the server stores it, but cannot read it.")
+                        .padding(.top, Theme.Spacing.xxl)
+                    }
+
+                    // `hasMore` is unset until a page lands, so on a failed history
+                    // fetch this spinner used to sit above the error state
+                    // retrying forever. Nothing to page through until the first
+                    // page succeeds.
+                    if chat.hasMoreByConversation[conversationId] != false,
+                       chat.historyErrors[conversationId] == nil {
                         ProgressView()
                             .padding()
                             .task { await chat.loadOlderMessages(conversationId) }
@@ -201,6 +243,7 @@ struct ChatThreadView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                     }
+                    .accessibilityLabel("Cancel reply")
                 }
                 .padding(.horizontal, Theme.Spacing.lg)
                 .padding(.vertical, Theme.Spacing.sm)
@@ -217,6 +260,7 @@ struct ChatThreadView: View {
                 // house gotcha `reference_ios26_photospicker_label_nonisolated`. It
                 // reads only static theme values, so nothing crosses.
                 .accessibilityIdentifier("chat.photo")
+                .accessibilityLabel("Send a photo")
 
                 TextField("Message", text: $draft, axis: .vertical)
                     .lineLimit(1 ... 5)
@@ -238,6 +282,10 @@ struct ChatThreadView: View {
                 }
                 .disabled(!canSend)
                 .accessibilityIdentifier("chat.send")
+                // The one icon-only control a chat app cannot afford to leave
+                // unlabelled. `PostDetailView`'s send button already labels itself;
+                // this one was announcing as a bare "Button".
+                .accessibilityLabel("Send")
             }
             .padding(.horizontal, Theme.Spacing.md)
             .padding(.vertical, Theme.Spacing.sm)

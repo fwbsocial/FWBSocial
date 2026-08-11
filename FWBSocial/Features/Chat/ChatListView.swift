@@ -13,12 +13,18 @@ import SwiftUI
 struct ChatListView: View {
     @State private var chat = ChatService.shared
     @State private var isPresentingNew = false
-    @State private var errorMessage: String?
 
     var body: some View {
         Group {
             if let error = chat.enrolmentError {
                 enrolmentFailure(error)
+            } else if chat.conversations.isEmpty, !chat.isLoadingConversations,
+                      let failure = chat.conversationsError {
+                // Ahead of the empty state deliberately. `ChatService` used to log
+                // and drop this error, so a member with no signal was shown "No
+                // conversations yet" — a confident, friendly claim about their
+                // account that the app had no basis for.
+                ErrorStateView(error: failure) { Task { await chat.refreshConversations() } }
             } else if chat.conversations.isEmpty && !chat.isLoadingConversations {
                 emptyState
             } else {
@@ -41,17 +47,22 @@ struct ChatListView: View {
             await HistoryHandoffService.shared.resumeIfNeeded()
         }
         .refreshable { await chat.refreshConversations() }
-        .alert("Something went wrong", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
     }
 
     // MARK: List
 
     private var list: some View {
         List {
+            // A refresh that failed over a list that already has content: one line,
+            // not a takeover. The conversations on screen are still real.
+            if let failure = chat.conversationsError {
+                Section {
+                    InlineErrorRow(message: failure.fwbMessage) {
+                        Task { await chat.refreshConversations() }
+                    }
+                }
+            }
+
             if !chat.pendingDevices.isEmpty {
                 Section {
                     NavigationLink {
@@ -161,7 +172,9 @@ private struct ConversationRow: View {
                 if conversation.unreadCount > 0 {
                     Text("\(conversation.unreadCount)")
                         .font(Theme.Typography.badge)
-                        .foregroundStyle(.white)
+                        // Over the brand-filled capsule, so it follows the accent
+                        // between appearances rather than staying white on mint.
+                        .foregroundStyle(Theme.Colors.onBrand)
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(Theme.Colors.brand, in: Capsule())

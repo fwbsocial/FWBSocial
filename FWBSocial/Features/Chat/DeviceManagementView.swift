@@ -24,6 +24,13 @@ struct DeviceManagementView: View {
     @State private var errorMessage: String?
     @State private var busyDeviceId: UUID?
     @State private var revokeTarget: ChatDeviceDTO?
+    /// Tracked here rather than on the service because the first load has to be
+    /// distinguishable from "you have no devices" — the list starts empty either
+    /// way, and without this the screen showed an empty "Your devices" section for
+    /// as long as the fetch took.
+    @State private var isLoadingDevices = true
+
+    private var approvedDevices: [ChatDeviceDTO] { chat.myDevices.filter(\.isApproved) }
 
     var body: some View {
         Form {
@@ -67,8 +74,30 @@ struct DeviceManagementView: View {
             }
 
             Section {
-                ForEach(chat.myDevices.filter(\.isApproved)) { device in
-                    deviceRow(device)
+                // loading → error → empty → content. The error branch reads the
+                // enrolment failure because that is what an empty device list almost
+                // always means: this phone never managed to register its keys, so
+                // there is nothing to list and saying "no devices" would blame the
+                // member for the app's problem.
+                if isLoadingDevices && approvedDevices.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView().accessibilityLabel("Loading your devices")
+                        Spacer()
+                    }
+                } else if approvedDevices.isEmpty, let enrolmentError = chat.enrolmentError {
+                    ErrorMessageStateView(message: enrolmentError) { Task { await refreshDevices() } }
+                        .listRowBackground(Color.clear)
+                } else if approvedDevices.isEmpty {
+                    EmptyStateView(
+                        icon: "iphone.slash",
+                        title: "No devices yet",
+                        message: "This phone appears here once it has finished setting up its encryption keys. Pull down to check again.")
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(approvedDevices) { device in
+                        deviceRow(device)
+                    }
                 }
             } header: {
                 Text("Your devices")
@@ -91,8 +120,8 @@ struct DeviceManagementView: View {
         }
         .navigationTitle("Devices")
         .navigationBarTitleDisplayMode(.inline)
-        .task { await chat.refreshMyDevices() }
-        .refreshable { await chat.refreshMyDevices() }
+        .task { await refreshDevices() }
+        .refreshable { await refreshDevices() }
         .confirmationDialog(
             "Revoke this device?",
             isPresented: .constant(revokeTarget != nil),
@@ -135,25 +164,49 @@ struct DeviceManagementView: View {
                     .foregroundStyle(Theme.Colors.caution)
             }
 
-            HStack(spacing: Theme.Spacing.md) {
-                Button("Approve") {
-                    Task {
-                        busyDeviceId = device.id
-                        defer { busyDeviceId = nil }
-                        do { try await chat.approveDevice(device) } catch {
-                            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-                        }
-                    }
+            // Both button styles apply `.frame(maxWidth: .infinity)`, so side by side
+            // they split the row — which at accessibility text sizes leaves each half
+            // narrower than the word inside it and the labels truncate. Stacking is
+            // the only thing that fits then, and this is the pair of buttons the
+            // member is least able to guess at from context.
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Theme.Spacing.md) {
+                    approveButton(device)
+                    rejectButton(device)
                 }
-                .buttonStyle(FWBPrimaryButtonStyle())
-                .accessibilityIdentifier("devices.approve.\(device.id.uuidString)")
-
-                Button("Reject", role: .destructive) { revokeTarget = device }
-                    .buttonStyle(FWBSecondaryButtonStyle())
+                VStack(spacing: Theme.Spacing.sm) {
+                    approveButton(device)
+                    rejectButton(device)
+                }
             }
             .disabled(busyDeviceId != nil)
         }
         .padding(.vertical, Theme.Spacing.xs)
+    }
+
+    private func approveButton(_ device: ChatDeviceDTO) -> some View {
+        Button("Approve") {
+            Task {
+                busyDeviceId = device.id
+                defer { busyDeviceId = nil }
+                do { try await chat.approveDevice(device) } catch {
+                    errorMessage = error.fwbMessage
+                }
+            }
+        }
+        .buttonStyle(FWBPrimaryButtonStyle())
+        .accessibilityIdentifier("devices.approve.\(device.id.uuidString)")
+    }
+
+    private func rejectButton(_ device: ChatDeviceDTO) -> some View {
+        Button("Reject", role: .destructive) { revokeTarget = device }
+            .buttonStyle(FWBSecondaryButtonStyle())
+    }
+
+    private func refreshDevices() async {
+        isLoadingDevices = true
+        await chat.refreshMyDevices()
+        isLoadingDevices = false
     }
 
     private func deviceRow(_ device: ChatDeviceDTO) -> some View {
@@ -191,6 +244,12 @@ struct DeviceManagementView: View {
 // wiped or traded in.
 
 struct NewPhoneGuideView: View {
+    /// The step badge's diameter, scaled with the badge font it contains. Fixed at
+    /// 22pt it stayed put while the numeral inside it grew, so at accessibility text
+    /// sizes the digit was clipped by its own circle — on the screen whose entire
+    /// point is that the member follows these four steps in order.
+    @ScaledMetric(relativeTo: .caption2) private var stepDiameter: CGFloat = 22
+
     var body: some View {
         Form {
             Section {
@@ -227,8 +286,13 @@ struct NewPhoneGuideView: View {
         HStack(alignment: .top, spacing: Theme.Spacing.md) {
             Text("\(number)")
                 .font(Theme.Typography.badge)
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
+                // Adaptive, not `.white`: against the dark-mode mint accent a fixed
+                // white numeral measures well under WCAG AA (house rule,
+                // `Theme.Colors.onBrand`).
+                .foregroundStyle(Theme.Colors.onBrand)
+                // `minWidth`/`minHeight` rather than a fixed frame, so a numeral that
+                // outgrows the badge pushes it out instead of being cut off.
+                .frame(minWidth: stepDiameter, minHeight: stepDiameter)
                 .background(Theme.Colors.brand, in: Circle())
             Text(text).font(Theme.Typography.body)
         }

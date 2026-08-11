@@ -26,13 +26,18 @@ struct ConversationSettingsView: View {
 
     private var conversation: ChatConversation? { chat.conversation(conversationId) }
 
+    /// The retention the server currently believes in, as opposed to `ttl`, which is
+    /// what the picker is showing. Keeping the two distinct is what lets a failed
+    /// write put the picker back where it was.
+    private var serverTTL: MessageTTL { MessageTTL.from(seconds: conversation?.disappearingSeconds) }
+
     var body: some View {
         Form {
             if let conversation {
                 if conversation.isGroup {
                     Section("Name") {
                         TextField("Group name", text: $titleDraft)
-                            .onSubmit { Task { try? await chat.setTitle(titleDraft, conversationId: conversationId) } }
+                            .onSubmit { Task { await saveTitle() } }
                     }
                 }
 
@@ -59,7 +64,13 @@ struct ConversationSettingsView: View {
                         }
                     }
                     .onChange(of: ttl) { _, newValue in
-                        Task { try? await chat.setMessageTTL(newValue, conversationId: conversationId) }
+                        // Only write when the picker has actually moved away from the
+                        // server's value. That skips two writes nobody asked for: the
+                        // one `.task` used to trigger just by seeding the picker, and
+                        // the one a revert below would otherwise trigger on its way
+                        // back.
+                        guard newValue != serverTTL else { return }
+                        Task { await saveTTL(newValue) }
                     }
                 } header: {
                     Text("Message history")
@@ -100,13 +111,40 @@ struct ConversationSettingsView: View {
                 if let errorMessage {
                     Section { FormErrorText(message: errorMessage) }
                 }
+            } else if chat.isLoadingConversations {
+                Section {
+                    HStack { Spacer(); ProgressView(); Spacer() }
+                }
+            } else if let conversationsError = chat.conversationsError {
+                // Same order as everywhere else — loading, then error, then the
+                // "we looked and it isn't there" state below. Without this branch the
+                // whole Form rendered as a blank screen under a "Details" title, which
+                // reads as a broken app rather than as a failed fetch.
+                Section {
+                    ErrorStateView(error: conversationsError) {
+                        Task { await chat.refreshConversations() }
+                    }
+                    .listRowBackground(Color.clear)
+                }
+            } else {
+                Section {
+                    EmptyStateView(
+                        icon: "bubble.left.and.exclamationmark.bubble.right",
+                        title: "Conversation unavailable",
+                        message: "We can't find this conversation any more. It may have been deleted, or you may have left it on another device.")
+                    .listRowBackground(Color.clear)
+                }
             }
         }
         .navigationTitle("Details")
         .navigationBarTitleDisplayMode(.inline)
         .task {
+            // A cold launch straight into this screen (a notification tap, a restored
+            // scene) can arrive before the conversation list exists, and the settings
+            // for a conversation we haven't loaded are not settings at all.
+            if conversation == nil { await chat.refreshConversations() }
             titleDraft = conversation?.title ?? ""
-            ttl = MessageTTL.from(seconds: conversation?.disappearingSeconds)
+            ttl = serverTTL
         }
         .confirmationDialog("Leave this conversation?", isPresented: $isConfirmingLeave, titleVisibility: .visible) {
             Button("Leave", role: .destructive) {
@@ -119,6 +157,44 @@ struct ConversationSettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Writes
+    //
+    // Both of these used to be `try? await` — the call fired, the error was dropped
+    // on the floor, and the control kept showing the value the member had just
+    // chosen. The screen therefore disagreed with the server and said nothing about
+    // it, which for the TTL below is not a cosmetic problem: it is a retention
+    // control silently failing to apply.
+
+    private func saveTitle() async {
+        let previous = conversation?.title ?? ""
+        do {
+            try await chat.setTitle(titleDraft, conversationId: conversationId)
+            errorMessage = nil
+        } catch {
+            guard !isCancellationError(error) else { return }
+            // Put the field back to the name the group actually has, so nobody walks
+            // away believing they renamed it.
+            titleDraft = previous
+            errorMessage = error.fwbMessage
+        }
+    }
+
+    private func saveTTL(_ newValue: MessageTTL) async {
+        let previous = serverTTL
+        do {
+            try await chat.setMessageTTL(newValue, conversationId: conversationId)
+            errorMessage = nil
+        } catch {
+            guard !isCancellationError(error) else { return }
+            // Reverting matters more here than anywhere else on this screen. Leaving
+            // the picker on "30 days" after the write failed tells everyone in the
+            // conversation their messages are being deleted on a schedule that is not
+            // running — a security control that is off while claiming to be on.
+            ttl = previous
+            errorMessage = error.fwbMessage
         }
     }
 }

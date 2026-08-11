@@ -60,6 +60,23 @@ final class ChatService {
     private(set) var isLoadingConversations = false
     private(set) var hasMoreByConversation: [UUID: Bool] = [:]
 
+    /// The last conversation-list load failed, and this is why.
+    ///
+    /// It used to be logged and dropped, which meant `ChatListView` showed its
+    /// designed "No conversations yet" empty state for a hard network failure — the
+    /// member was told, in a friendly voice, that they have no conversations, when
+    /// in fact the app had not managed to ask. Cleared on the next success.
+    private(set) var conversationsError: Error?
+
+    /// Same for a thread's history: a failed fetch drew an empty transcript, which
+    /// on an E2EE app reads as "the messages are gone", the single most alarming
+    /// thing this app can imply.
+    private(set) var historyErrors: [UUID: Error] = [:]
+
+    /// And for the device list, which is the surface that answers "who can read my
+    /// messages" — the one list where an empty result must never be a guess.
+    private(set) var devicesError: Error?
+
     /// Display names for everyone we have seen, so the list and the thread can label
     /// a sender without a lookup per row. Also the source for the App Group mirror
     /// the NSE reads.
@@ -270,7 +287,19 @@ final class ChatService {
     }
 
     func refreshMyDevices() async {
-        guard let devices = try? await ChatAPI.myDevices() else { return }
+        // The `try?` this replaces made a failed fetch indistinguishable from
+        // owning no devices, and `DeviceManagementView` is where a member goes to
+        // check exactly that — "no devices listed" on the screen that governs who
+        // can read your messages is the wrong thing to say when the truth is that
+        // the app could not ask.
+        let devices: [ChatDeviceDTO]
+        do {
+            devices = try await ChatAPI.myDevices()
+            devicesError = nil
+        } catch {
+            if !isCancellationError(error) { devicesError = error }
+            return
+        }
         myDevices = devices
         if let mine = await resolvedDeviceId(),
            let updated = devices.first(where: { $0.id == mine }) {
@@ -429,11 +458,16 @@ final class ChatService {
         do {
             let dtos = try await ChatAPI.conversations()
             conversations = dtos.map(ChatConversation.init(dto:))
+            conversationsError = nil
             await learnNames(for: conversations)
             mirrorConversationTitles()
             await refreshUnreadCount()
         } catch {
             logger.error("Conversation list failed: \(String(describing: error))")
+            // A cancelled refresh is not a failure worth showing — leaving the tab
+            // tears the task down and the member would come back to an error they
+            // caused by navigating.
+            if !isCancellationError(error) { conversationsError = error }
         }
     }
 
@@ -558,8 +592,10 @@ final class ChatService {
             let decrypted = await decrypt(page.items, conversationId: conversationId)
             messagesByConversation[conversationId] = decrypted.sorted { $0.createdAt < $1.createdAt }
             hasMoreByConversation[conversationId] = page.hasMore
+            historyErrors[conversationId] = nil
         } catch {
             logger.error("History failed for \(conversationId): \(String(describing: error))")
+            if !isCancellationError(error) { historyErrors[conversationId] = error }
         }
     }
 

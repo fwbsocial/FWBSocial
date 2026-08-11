@@ -26,6 +26,10 @@ struct NewConversationView: View {
     @State private var selected: Set<UUID> = []
     @State private var unreachable: Set<UUID> = []
     @State private var errorMessage: String?
+    /// The friend-list load's own failure, kept apart from `errorMessage` (which
+    /// belongs to the Start action) because the two need different treatments: this
+    /// one replaces the list, that one sits under it.
+    @State private var loadError: Error?
 
     var body: some View {
         Form {
@@ -39,6 +43,13 @@ struct NewConversationView: View {
             Section {
                 if isLoading {
                     ProgressView()
+                } else if let loadError {
+                    // loading → error → empty → content. "No friends yet" is a claim
+                    // about the server's answer, and a request that failed is not an
+                    // answer: the member was being told they have no friends and
+                    // pointed at the friend-code flow because a fetch timed out.
+                    ErrorStateView(error: loadError) { Task { await load() } }
+                        .listRowBackground(Color.clear)
                 } else if friends.isEmpty {
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                         Text("No friends yet")
@@ -106,17 +117,35 @@ struct NewConversationView: View {
                 if selected.contains(friend.userId) {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(Theme.Colors.brand)
+                        .accessibilityHidden(true)
                 }
             }
         }
         .buttonStyle(.plain)
         .foregroundStyle(unreachable.contains(friend.userId) ? Color.secondary : Color.primary)
+        // Group selection was carried entirely by a checkmark glyph, so VoiceOver
+        // read a picked and an unpicked friend identically — with no way to check
+        // who is in the group before tapping Start.
+        .accessibilityAddTraits(selected.contains(friend.userId) ? [.isSelected] : [])
         .accessibilityIdentifier("chat.new.friend.\(friend.userId.uuidString)")
     }
 
     private func load() async {
+        isLoading = true
+        loadError = nil
         defer { isLoading = false }
-        friends = (try? await FriendsAPI.friends()) ?? []
+
+        do {
+            friends = try await FriendsAPI.friends()
+        } catch {
+            // A cancelled load is the member navigating away, not a failure worth
+            // showing them when they come back.
+            guard !isCancellationError(error) else { return }
+            friends = []
+            loadError = error
+            return
+        }
+
         // Probe each friend once so the row can grey out before the member commits
         // to composing anything.
         for friend in friends {
