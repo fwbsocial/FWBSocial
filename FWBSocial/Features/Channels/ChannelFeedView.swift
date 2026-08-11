@@ -40,6 +40,10 @@ struct ChannelFeedView: View {
     private var pinned: [ForumPost] { visiblePosts.filter(\.pinned) }
     private var unpinned: [ForumPost] { visiblePosts.filter { !$0.pinned } }
 
+    /// The SERVER's resolved role, never a computed one. An archived channel takes
+    /// the composer away from everyone, poster or not.
+    private var canPostHere: Bool { current.mayPost && !current.archived }
+
     var body: some View {
         List {
             Group {
@@ -120,13 +124,27 @@ struct ChannelFeedView: View {
             }
 
         }
-        // Only where the resolved role allows it — a button that appears and then
-        // 403s is worse than no button.
+        // Owner directive 2026-08-11: the slot is never empty. A poster gets the
+        // composer, which is what they came for. A comment-only member gets the
+        // one channel-level control that is genuinely theirs — the mute — instead
+        // of a compose button that would 403, or a blank slot.
+        //
+        // The glyph reflects the CURRENT state (a bell when notifications are on,
+        // a struck bell when they are off) and the label names the action.
+        //
+        // The visible word is bare — "New", "Mute" — because it has to fit a tab.
+        // That is fine for a member who can see which channel they are in and
+        // cannot be for one who cannot, so the spoken label names it outright.
         .floatingAction(
-            isVisible: current.mayPost && !current.archived,
-            systemImage: "square.and.pencil",
-            label: "New post"
-        ) { isComposing = true }
+            isVisible: true,
+            systemImage: canPostHere ? "square.and.pencil" : (current.isMuted ? "bell.slash" : "bell"),
+            label: canPostHere ? "New" : (current.isMuted ? "Unmute" : "Mute"),
+            voiceOverLabel: canPostHere
+                ? "New post in \(current.displayName)"
+                : (current.isMuted ? "Unmute \(current.displayName)" : "Mute \(current.displayName)")
+        ) {
+            if canPostHere { isComposing = true } else { toggleMute() }
+        }
         .task {
             guard !hasLoaded else { return }
             await blocks.loadIfNeeded()
