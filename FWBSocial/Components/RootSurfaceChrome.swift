@@ -61,7 +61,7 @@ private struct RootSurfaceChrome: ViewModifier {
                             isPresentingProfile = true
                         } label: {
                             AvatarView(name: user.displayName, url: user.avatarUrl)
-                                .frame(width: 40, height: 40)
+                                .frame(width: 44, height: 44)
                                 .clipShape(Circle())
                         }
                         .buttonStyle(.plain)
