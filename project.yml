@@ -31,6 +31,8 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: FWBSocial
+        excludes:
+          - "FWBSocial.entitlements"
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: events.fwb.social
@@ -39,6 +41,17 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: FWBSocial
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        # Sign in with Apple (Guideline 4.8) + Declared Age Range (commissioner
+        # Q16) + APNs. See FWBSocial.entitlements for the portal capabilities
+        # each one needs enabled on App ID `events.fwb.social`.
+        CODE_SIGN_ENTITLEMENTS: FWBSocial/FWBSocial.entitlements
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        # A release build's APNs token is a production token; saying otherwise
+        # makes it silently undeliverable.
+        Release:
+          APS_ENVIRONMENT: production
     info:
       path: FWBSocial/Info.plist
       properties:

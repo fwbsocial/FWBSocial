@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Sign in with Apple — Guideline 4.8, ships day one (PLAN.md §3.1, §6.1).
+	     The App ID `events.fwb.social` under team NVT8G575R7 needs the
+	     "Sign in with Apple" capability enabled in the Developer portal, or a
+	     device/distribution build fails to sign. Simulator builds do not check. -->
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+
+	<!-- Declared Age Range — commissioner decision Q16: the 18+ gate is the
+	     system Declared Age Range API, not a self-declared birthdate.
+	     Portal capability: "Declared Age Range" (BOOLEAN, no distribution
+	     approval required). Without it, `AgeRangeService` throws
+	     `.notAvailable` at runtime on device. -->
+	<key>com.apple.developer.declared-age-range</key>
+	<true/>
+
+	<!-- APNs. Resolved from the `APS_ENVIRONMENT` build setting: `development`
+	     for Debug (devicectl installs), `production` for Release — see
+	     project.yml. A release build that claims `development` gets a token
+	     APNs will not deliver to, and the failure is silent.
+	     Requires the Push Notifications capability on the App ID. -->
+	<key>aps-environment</key>
+	<string>$(APS_ENVIRONMENT)</string>
+</dict>
+</plist>
