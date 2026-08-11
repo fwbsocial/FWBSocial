@@ -149,10 +149,43 @@ final class APIClient {
         }
     }
 
-    /// Try to surface a server-provided error `reason`/`error` message.
+    /// Try to surface a server-provided error message.
+    ///
+    /// fwb-server emits **two** error shapes and this has to read both:
+    ///
+    ///   Vapor's default   `{ "reason": "..." }`
+    ///   Structured        `{ "error": { "code": "account.pending_vetting",
+    ///                                   "message": "You'll get access once …" } }`
+    ///
+    /// The nested one comes from `RequireVettedMember` and carries the account
+    /// state (`pending_vetting`, `banned`, `vetting_revoked`, `rejected`). Reading
+    /// only the flat shape — as this did — meant `obj["error"]` was a dictionary,
+    /// the `as? String` cast failed, and every vetting and ban response degraded
+    /// to "Server returned HTTP 403" while the server was in fact explaining
+    /// itself perfectly well.
+    ///
+    /// Surfacing `error.message` is also what lets a 403 screen distinguish
+    /// pending from banned from revoked **without** matching on codes: the server
+    /// already wrote the right sentence for each.
     private static func serverMessage(from data: Data) -> String? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        return (obj["reason"] as? String) ?? (obj["error"] as? String) ?? (obj["message"] as? String)
+
+        if let nested = obj["error"] as? [String: Any] {
+            if let message = nested["message"] as? String { return message }
+            if let code = nested["code"] as? String { return code }
+        }
+        return (obj["reason"] as? String)
+            ?? (obj["error"] as? String)
+            ?? (obj["message"] as? String)
+    }
+
+    /// The structured error code, when the server sent one
+    /// (`account.pending_vetting`, `account.banned`, …). Nil for Vapor's flat
+    /// `reason` shape.
+    nonisolated static func serverErrorCode(from data: Data) -> String? {
+        guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let nested = obj["error"] as? [String: Any] else { return nil }
+        return nested["code"] as? String
     }
 
     // MARK: - Convenience verbs

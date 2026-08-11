@@ -22,10 +22,12 @@ struct ChannelsView: View {
     @State private var isLoading = false
     @State private var error: String?
     @State private var hasLoaded = false
+    /// The server's own explanation for a 403, when it sent one.
+    @State private var accessMessage: String?
 
     var body: some View {
         Group {
-            if !auth.isVettedForForum && hasLoaded && channels.isEmpty {
+            if hasLoaded && channels.isEmpty && (accessMessage != nil || !auth.isVettedForForum) {
                 pendingState
             } else if channels.isEmpty && hasLoaded && error == nil {
                 EmptyStateView(
@@ -76,11 +78,17 @@ struct ChannelsView: View {
     /// A `pending` member gets 403 on every `/api/channels/*` route. Plan §4.6:
     /// "Pending members get a real app… Never a blank screen." So the tab
     /// explains itself rather than showing an error or an empty list.
+    ///
+    /// The sentence comes from the server when it sent one. `RequireVettedMember`
+    /// distinguishes pending / banned / revoked / rejected and writes the right
+    /// message for each; showing our own copy for all four would tell a banned
+    /// member to go check in at an event.
     private var pendingState: some View {
         EmptyStateView(
-            icon: "clock.badge.checkmark",
-            title: "Channels unlock once you're vetted",
-            message: "Check in at an fwb social event and your account is approved automatically. You'll get the channels the moment that happens.")
+            icon: accessMessage == nil ? "clock.badge.checkmark" : "lock.circle",
+            title: accessMessage == nil ? "Channels unlock once you're vetted" : "Channels aren't available",
+            message: accessMessage
+                ?? "Check in at an fwb social event and your account is approved automatically. You'll get the channels the moment that happens.")
     }
 
     // MARK: - Load
@@ -97,9 +105,11 @@ struct ChannelsView: View {
         do {
             channels = try await APIClient.shared.channels()
             hasLoaded = true
-        } catch let APIError.httpError(code, _) where code == 403 {
-            // Not vetted yet — an expected answer, not a failure to report.
+        } catch let APIError.httpError(code, message) where code == 403 {
+            // Not vetted (or banned, or revoked) — an expected answer, not a
+            // failure to report. The server's message says which.
             channels = []
+            accessMessage = message
             hasLoaded = true
         } catch {
             guard !isCancellationError(error) else { isLoading = false; return }
