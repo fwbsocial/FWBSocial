@@ -1,11 +1,33 @@
 {
   "images": [
     {
+      "filename": "ClubhouseBackdropLight@2x.jpg",
+      "idiom": "universal",
+      "scale": "2x"
+    },
+    {
+      "filename": "ClubhouseBackdropLight@3x.jpg",
+      "idiom": "universal",
+      "scale": "3x"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
       "filename": "ClubhouseBackdrop@2x.jpg",
       "idiom": "universal",
       "scale": "2x"
     },
     {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
       "filename": "ClubhouseBackdrop@3x.jpg",
       "idiom": "universal",
       "scale": "3x"

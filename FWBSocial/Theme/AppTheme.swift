@@ -163,17 +163,17 @@ enum AppTheme: String, CaseIterable, Identifiable {
     /// them with no view doing anything.
     enum Pine {
         /// Top of the ramp.
-        static let deep    = adaptive(light: 0xF2F7F4, dark: 0x162B25)
+        static let deep    = adaptive(light: 0xCFE4D8, dark: 0x162B25)
         /// The flat background, and the middle of the ramp.
-        static let base    = adaptive(light: 0xE8F1EC, dark: 0x1A332C)
+        static let base    = adaptive(light: 0xBFDACB, dark: 0x1A332C)
         /// Bottom of the ramp.
-        static let raised  = adaptive(light: 0xD9E8E0, dark: 0x204038)
+        static let raised  = adaptive(light: 0xAFCFBE, dark: 0x204038)
         /// A card or row, lifted off the ground.
         static let lifted  = adaptive(light: 0xFAFCFB, dark: 0x24463C)
         /// A field, sunk into it.
-        static let sunken  = adaptive(light: 0xDDEAE4, dark: 0x142822)
+        static let sunken  = adaptive(light: 0xA9CCBA, dark: 0x142822)
         /// An incoming bubble.
-        static let bubble  = adaptive(light: 0xDCEAE3, dark: 0x2B5147)
+        static let bubble  = adaptive(light: 0xB3D2C2, dark: 0x2B5147)
         /// A separator: the pine hue in light, a plain white lift in dark.
         static let hairline = Color(uiColor: UIColor { tc in
             tc.userInterfaceStyle == .dark
@@ -247,16 +247,19 @@ private struct ClubhouseBackdrop: View {
             }
             .clipped()
             .overlay {
-                // Flat wash. Light needs much more of it: the source is a dark
-                // painting, and dark text on it is unreadable at any smaller value.
+                // Flat wash. Light mode's lift is BAKED INTO the asset now (a
+                // brightened variant of the painting), so the runtime scrim only
+                // trims the last stop of contrast instead of erasing the art —
+                // the 0.74 veil made light Clubhouse indistinguishable from a
+                // flat tint (owner feedback 2026-08-11).
                 (isDark ? Color.black : Color.white)
-                    .opacity(isDark ? 0.42 : 0.74)
+                    .opacity(isDark ? 0.42 : 0.20)
             }
             .overlay {
                 LinearGradient(
                     colors: isDark
                         ? [.black.opacity(0.34), .black.opacity(0.06), .black.opacity(0.40)]
-                        : [.white.opacity(0.42), .white.opacity(0.04), .white.opacity(0.46)],
+                        : [.white.opacity(0.26), .white.opacity(0.02), .white.opacity(0.28)],
                     startPoint: .top,
                     endPoint: .bottom)
             }
