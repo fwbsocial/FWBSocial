@@ -80,6 +80,7 @@ struct ProfileView: View {
                     .padding(.vertical, Theme.Spacing.xs)
 
                     Button("Edit profile") { showEditProfile = true }
+                        .accessibilityIdentifier("profile.editProfile")
                 }
 
                 Section {

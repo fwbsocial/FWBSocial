@@ -24,6 +24,8 @@ struct FriendingWindowView: View {
     let eventName: String?
 
     @State private var attendees: [EventAttendeeDTO] = []
+    @State private var friendCount = 0
+    @State private var notYetJoinedCount = 0
     @State private var isLoading = true
     @State private var isClosed = false
     @State private var pending: Set<UUID> = []
@@ -56,6 +58,10 @@ struct FriendingWindowView: View {
                     message: "Either you're the first one here, or the others have chosen not to appear on attendee lists."
                 )
             } else {
+                // "X to add · Y already friends · Z haven't joined yet" —
+                // owner-approved roster composition summary (2026-08-11).
+                rosterSummary
+
                 LazyVGrid(columns: columns, spacing: Theme.Spacing.md) {
                     ForEach(attendees) { attendee in
                         AttendeeCard(
@@ -111,7 +117,10 @@ struct FriendingWindowView: View {
         isLoading = true
         loadError = nil
         do {
-            attendees = try await EventsAPI.attendees(lumaEventId: lumaEventId)
+            let roster = try await EventsAPI.attendees(lumaEventId: lumaEventId)
+            attendees = roster.items
+            friendCount = roster.friendCount
+            notYetJoinedCount = roster.notYetJoinedCount
             isClosed = false
         } catch let APIError.httpError(code, _) where code == 404 {
             isClosed = true
@@ -120,6 +129,19 @@ struct FriendingWindowView: View {
             loadError = error
         }
         isLoading = false
+    }
+
+    private var rosterSummary: some View {
+        let addable = attendees.filter { !$0.isFriend }.count
+        var parts: [String] = []
+        parts.append("\(addable) to add")
+        if friendCount > 0 { parts.append("\(friendCount) already friends") }
+        if notYetJoinedCount > 0 { parts.append("\(notYetJoinedCount) haven't joined yet") }
+        return Text(parts.joined(separator: " · "))
+            .font(Theme.Typography.caption)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.top, Theme.Spacing.sm)
     }
 
     private func add(_ attendee: EventAttendeeDTO) async {
@@ -161,6 +183,9 @@ private struct AttendeeCard: View {
                 AvatarView(name: attendee.displayName, url: attendee.avatarUrl, size: 104)
 
                 VStack(spacing: 2) {
+                    if attendee.isHost == true {
+                        StatusBadge("Host", color: Theme.Colors.brand)
+                    }
                     Text(attendee.displayName)
                         .font(Theme.Typography.rowTitle)
                         // These cells are `GridItem(.adaptive(minimum: 150))`, and

@@ -26,6 +26,14 @@ nonisolated struct FriendingWindowDTO: Decodable, Sendable, Identifiable {
     let attendeeCount: Int
 }
 
+/// Server f5ac1ff: the roster is an envelope — rows plus the aggregate counts
+/// the summary line renders ("X to add · Y already friends · Z haven't joined").
+nonisolated struct AttendeeRosterDTO: Decodable, Sendable {
+    let items: [EventAttendeeDTO]
+    let friendCount: Int
+    let notYetJoinedCount: Int
+}
+
 nonisolated struct EventAttendeeDTO: Decodable, Sendable, Identifiable {
     var id: UUID { userId }
     let userId: UUID
@@ -34,6 +42,8 @@ nonisolated struct EventAttendeeDTO: Decodable, Sendable, Identifiable {
     let avatarUrl: String?
     let bio: String?
     let isFriend: Bool
+    /// Hosts get a roster seat (server f5ac1ff); nil-safe for older payloads.
+    let isHost: Bool?
     /// `none` · `outgoing` · `incoming`.
     let requestState: String
 
@@ -84,7 +94,7 @@ enum EventsAPI {
     /// weren't there — and the client must not try to tell them apart. Rendering a
     /// single "this window has closed" state for all three is the correct
     /// behaviour, not a shortcut.
-    static func attendees(lumaEventId: String) async throws -> [EventAttendeeDTO] {
+    static func attendees(lumaEventId: String) async throws -> AttendeeRosterDTO {
         let encoded = lumaEventId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? lumaEventId
         return try await api.get("/api/events/\(encoded)/attendees")
     }
