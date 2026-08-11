@@ -18,14 +18,16 @@ struct ChannelsView: View {
     @State private var auth = AuthService.shared
     @State private var blocks = BlockStore.shared
 
-    @State private var channels: [Channel] = []
-    @State private var isLoading = false
-    // Kept unflattened so the view can distinguish an offline device from a
-    // server refusal, and so the server's own sentence survives to the screen.
-    @State private var loadError: Error?
-    @State private var hasLoaded = false
-    /// The server's own explanation for a 403, when it sent one.
-    @State private var accessMessage: String?
+    /// The list, the server-resolved roles and the 403 explanation all live in
+    /// the store, warmed at launch by `AppPrefetch` (owner directive 2026-08-11:
+    /// a member never sees a tab load). They were `@State` here, which meant
+    /// nothing existed until the first visit and every return to the tab
+    /// refetched from scratch, flashing the empty state on the way.
+    ///
+    /// The store keeps the failure unflattened for the same reason this view
+    /// did: an offline device and a server refusal are different problems, and
+    /// the server's own sentence is the content of the vetting state.
+    @State private var store = ChannelsStore.shared
 
     // The tab's contextual action (owner directive 2026-08-11). Two different
     // actions behind one slot, because "what can you start from a list of
@@ -38,11 +40,6 @@ struct ChannelsView: View {
     @State private var pendingPostChannel: Channel?
     @State private var postTarget: Channel?
 
-    /// Only where the SERVER's resolved role allows a thread to be started.
-    private var postableChannels: [Channel] {
-        channels.filter { $0.mayPost && !$0.archived }
-    }
-
     /// An admin always has something to do here. A member has something to do here
     /// once the forum is open to them at all — a `pending` member gets 403 on every
     /// `/api/channels/*` route and is looking at the vetting screen, so the slot
@@ -53,15 +50,16 @@ struct ChannelsView: View {
 
     var body: some View {
         Group {
-            if hasLoaded && channels.isEmpty && (accessMessage != nil || !auth.isVettedForForum) {
+            if store.hasLoaded && store.channels.isEmpty
+                && (store.accessMessage != nil || !auth.isVettedForForum) {
                 pendingState
-            } else if channels.isEmpty, hasLoaded, let failure = loadError {
+            } else if store.channels.isEmpty, store.hasLoaded, let failure = store.loadError {
                 // Previously this case fell through to `list`, which drew an empty
                 // List with a thin error line in it — a blank screen with a
                 // footnote, and no way to retry short of a pull-to-refresh on
                 // nothing.
-                ErrorStateView(error: failure) { Task { await load() } }
-            } else if channels.isEmpty && hasLoaded && loadError == nil {
+                ErrorStateView(error: failure) { Task { await store.refresh() } }
+            } else if store.channels.isEmpty && store.hasLoaded && store.loadError == nil {
                 EmptyStateView(
                     icon: "bubble.left.and.bubble.right",
                     title: "No channels yet",
@@ -85,7 +83,7 @@ struct ChannelsView: View {
             // the admin route answers from the ADMIN's point of view
             // (`effective_role: moderator`, `muted: false`), which is not what this
             // list draws.
-            ChannelCreateView { _ in Task { await load() } }
+            ChannelCreateView { _ in Task { await store.refresh() } }
         }
         .sheet(isPresented: $isPickingChannel, onDismiss: {
             guard let chosen = pendingPostChannel else { return }
@@ -93,20 +91,23 @@ struct ChannelsView: View {
             postTarget = chosen
         }) {
             DismissableSheet {
-                ChannelPickerSheet(channels: postableChannels) { channel in
+                ChannelPickerSheet(channels: store.postableChannels) { channel in
                     pendingPostChannel = channel
                     isPickingChannel = false
                 }
             }
         }
         .sheet(item: $postTarget) { channel in
-            PostComposerView(channel: channel) { _ in Task { await load() } }
+            PostComposerView(channel: channel) { _ in Task { await store.refresh() } }
         }
+        // Warm, not load: `AppPrefetch` already fired both of these at launch,
+        // and each is a no-op once it holds data. Entering the tab a second time
+        // does nothing visible at all.
         .task {
             await blocks.loadIfNeeded()
-            await loadIfNeeded()
+            await store.warm()
         }
-        .refreshable { await load() }
+        .refreshable { await store.refresh() }
     }
 
     // MARK: - List
@@ -116,11 +117,15 @@ struct ChannelsView: View {
             Group {
                 // Only over content — an empty list with an error takes the whole
                 // surface above, where the retry lives.
-                if let loadError {
-                    Section { InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } } }
+                if let failure = store.loadError {
+                    Section {
+                        InlineErrorRow(message: failure.fwbMessage) {
+                            Task { await store.refresh() }
+                        }
+                    }
                 }
 
-                ForEach(channels) { channel in
+                ForEach(store.channels) { channel in
                     NavigationLink {
                         ChannelFeedView(channel: channel)
                             .fwbAppThemeSurface()
@@ -130,7 +135,9 @@ struct ChannelsView: View {
                     .accessibilityIdentifier("channel.\(channel.slug)")
                 }
 
-                if isLoading && channels.isEmpty {
+                // The ONE spinner, and only before any data has ever arrived.
+                // Every later refresh happens behind the rows (`ChannelsStore`).
+                if store.isInitialLoading && store.channels.isEmpty {
                     Section {
                         HStack {
                             Spacer()
@@ -161,39 +168,12 @@ struct ChannelsView: View {
     /// member to go check in at an event.
     private var pendingState: some View {
         EmptyStateView(
-            icon: accessMessage == nil ? "clock.badge.checkmark" : "lock.circle",
-            title: accessMessage == nil ? "Channels unlock once you're vetted" : "Channels aren't available",
-            message: accessMessage
+            icon: store.accessMessage == nil ? "clock.badge.checkmark" : "lock.circle",
+            title: store.accessMessage == nil ? "Channels unlock once you're vetted" : "Channels aren't available",
+            message: store.accessMessage
                 ?? "Check in at an fwb social event and your account is approved automatically. You'll get the channels the moment that happens.")
     }
 
-    // MARK: - Load
-
-    private func loadIfNeeded() async {
-        guard !hasLoaded else { return }
-        await load()
-    }
-
-    private func load() async {
-        guard auth.isSignedIn else { return }
-        isLoading = true
-        loadError = nil
-        do {
-            channels = try await APIClient.shared.channels()
-            hasLoaded = true
-        } catch let APIError.httpError(code, message) where code == 403 {
-            // Not vetted (or banned, or revoked) — an expected answer, not a
-            // failure to report. The server's message says which.
-            channels = []
-            accessMessage = message
-            hasLoaded = true
-        } catch {
-            guard !isCancellationError(error) else { isLoading = false; return }
-            self.loadError = error
-            hasLoaded = true
-        }
-        isLoading = false
-    }
 }
 
 // MARK: - Row

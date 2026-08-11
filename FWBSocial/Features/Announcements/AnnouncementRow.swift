@@ -8,6 +8,13 @@ struct AnnouncementRow: View {
     /// footer. A member has no idea what a pin is and no way to change one, so
     /// showing them a schedule would be noise about a control they do not have.
     var isAdmin: Bool = false
+    /// Whether to draw the unread dot.
+    ///
+    /// Passed in rather than read off the row, because the feed's source of truth
+    /// for read state is `AnnouncementsStore` — it knows about announcements
+    /// opened this session, which the wire model (fetched before the tap) cannot.
+    /// Defaults to the row's own answer so every other caller is unaffected.
+    var isUnread: Bool?
 
     var body: some View {
         FWBCard {
@@ -28,7 +35,7 @@ struct AnnouncementRow: View {
                         .foregroundStyle(.primary)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: Theme.Spacing.sm)
-                    if announcement.isUnread {
+                    if isUnread ?? announcement.isUnread {
                         Circle()
                             .fill(Theme.Colors.brand)
                             .frame(width: 8, height: 8)

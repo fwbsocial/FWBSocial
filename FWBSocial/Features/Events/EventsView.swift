@@ -13,12 +13,15 @@ import SwiftUI
 
 struct EventsView: View {
     @Environment(AppState.self) private var appState
-    @State private var windows: [FriendingWindowDTO] = []
-    @State private var lumaStatus: LumaEmailStatusDTO?
-    @State private var isLoading = true
-    // Kept unflattened so the offline branch and the server's own refusal message
-    // both survive as far as the view. See `ErrorStateView`.
-    @State private var loadError: Error?
+    /// The windows and the Luma status live in `EventsStore`, warmed at launch by
+    /// `AppPrefetch` (owner directive 2026-08-11: a member never sees a tab
+    /// load). They were `@State` here, so the countdown cards did not exist until
+    /// the tab was first opened and were refetched on every return to it.
+    ///
+    /// The store keeps the failure unflattened for the reason this view already
+    /// cared about: the vetting refusal is the likeliest failure on this screen
+    /// and the server writes the sentence for it. See `ErrorStateView`.
+    @State private var store = EventsStore.shared
     @State private var isAddingFriend = false
 
     var body: some View {
@@ -35,18 +38,29 @@ struct EventsView: View {
                 // The Luma-email card sits ABOVE the windows on purpose: an
                 // unmatched member sees an empty Events tab and no explanation,
                 // and this card is the explanation (§4.5.3).
-                if let lumaStatus, !lumaStatus.verified {
-                    LumaEmailCard(status: lumaStatus) { await load() }
+                if let status = store.lumaStatus, !status.verified {
+                    LumaEmailCard(status: status) { await store.refresh() }
                 }
 
-                if isLoading {
+                // The ONE spinner: before any data has ever arrived, and never
+                // again. With the launch prefetch in place the member should not
+                // reach it — every later refresh happens behind the cards.
+                if !store.hasLoaded {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, Theme.Spacing.xxl)
-                } else if let loadError {
-                    ErrorStateView(error: loadError) { Task { await load() } }
-                } else if windows.isEmpty {
+                } else if let failure = store.loadError, store.windows.isEmpty {
+                    ErrorStateView(error: failure) { Task { await store.refresh() } }
+                } else if store.windows.isEmpty {
                     closedState
                 } else {
-                    ForEach(windows) { window in
+                    // A refresh that failed over windows already on screen is one
+                    // line, not a takeover — the countdowns behind it are real.
+                    if let failure = store.loadError {
+                        InlineErrorRow(message: failure.fwbMessage) {
+                            Task { await store.refresh() }
+                        }
+                    }
+
+                    ForEach(store.windows) { window in
                         NavigationLink(value: window.lumaEventId) {
                             FriendingWindowCard(window: window)
                         }
@@ -76,14 +90,17 @@ struct EventsView: View {
         .navigationDestination(for: String.self) { lumaEventId in
             FriendingWindowView(
                 lumaEventId: lumaEventId,
-                eventName: windows.first { $0.lumaEventId == lumaEventId }?.eventName
+                eventName: store.windows.first { $0.lumaEventId == lumaEventId }?.eventName
             )
             // A pushed destination is a sibling in the stack, so it needs the
             // theme's surface of its own. See `fwbAppThemeSurface()`.
             .fwbAppThemeSurface()
         }
-        .task { await load() }
-        .refreshable { await load() }
+        // Warm, not load: `AppPrefetch` fired this at launch and it is a no-op
+        // once the store holds an answer, so entering the tab shows the cards
+        // that are already there rather than reloading them.
+        .task { await store.warm() }
+        .refreshable { await store.refresh() }
         // A `FRIENDING_WINDOW` push deep-links straight to the roster — the window
         // is 48 hours long and the push is the only thing that tells you it opened.
         .onChange(of: appState.pendingEventId) { _, id in
@@ -99,35 +116,12 @@ struct EventsView: View {
         EmptyStateView(
             icon: "calendar.badge.clock",
             title: "No open windows",
-            message: lumaStatus?.verified == false
+            message: store.lumaStatus?.verified == false
                 ? "Once we can match you to an event check-in, the people you met there will show up here for 48 hours."
                 : "When an event you checked into ends, you'll have 48 hours to add the people who were there."
         )
     }
 
-    private func load() async {
-        loadError = nil
-
-        // The Luma status is genuinely optional — it only decides whether an
-        // explanatory card appears — so its failure stays swallowed. The windows
-        // are the screen, so theirs does not.
-        //
-        // It used to be `try?` on both, which destroyed the `APIError` before
-        // anything could read it: a 403 "you aren't vetted yet" and a DNS failure
-        // both came out as "We couldn't reach the server." The vetting refusal is
-        // the single most likely failure on this screen and the server writes a
-        // perfectly good sentence for it.
-        async let statusTask = try? await EventsAPI.lumaEmailStatus()
-        async let windowsTask = EventsAPI.openWindows()
-
-        lumaStatus = await statusTask
-        do {
-            windows = try await windowsTask
-        } catch {
-            if !isCancellationError(error) { loadError = error }
-        }
-        isLoading = false
-    }
 }
 
 // MARK: - Window card

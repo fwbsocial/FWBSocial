@@ -95,7 +95,10 @@ struct AnnouncementDetailView: View {
                         // trailing corner holds one control rather than two.
                         AnnouncementKebabMenu(
                             announcement: announcement,
-                            handlers: handlers(for: announcement))
+                            handlers: handlers(for: announcement),
+                            // The bar supplies the target and the bubble; a
+                            // 44pt-wide glyph in here is what made it an oval.
+                            placement: .toolbar)
                     } else {
                         ShareLink(item: announcement.shareText)
                     }
@@ -136,10 +139,12 @@ struct AnnouncementDetailView: View {
         .task {
             announcement = preloaded
             await load()
-            // Fire-and-forget: failing to record a read is not worth
-            // interrupting anyone over, and the row's unread dot corrects itself
-            // on the next refresh either way.
-            await APIClient.shared.markAnnouncementRead(id: announcementId)
+            // Through the store, so the feed's dot clears the moment this screen
+            // opens rather than at whatever refresh happens next — the feed no
+            // longer refetches on every tab entry, so "the next refresh" could
+            // be minutes away. Still fire-and-forget on the wire: failing to
+            // record a read is not worth interrupting anyone over.
+            await AnnouncementsStore.shared.markRead(id: announcementId)
         }
     }
 

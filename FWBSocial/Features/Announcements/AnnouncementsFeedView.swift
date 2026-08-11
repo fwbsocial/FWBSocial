@@ -11,13 +11,18 @@ import SwiftUI
 //  * **The admin affordances are drawn from `isAdmin`, never trusted from it.**
 //    The compose/edit/delete routes are behind the server's `RequireAdmin`; the
 //    client flag decides what to draw and nothing else.
+//  * **The feed's data is not this view's.** It lives in `AnnouncementsStore`,
+//    warmed at launch by `AppPrefetch` so the tab has content before it is first
+//    opened, and so navigating away and back never reloads (owner directive
+//    2026-08-11). The same `PaginatedLoader` still drives page two onwards; it
+//    simply lives in the store now.
 
 struct AnnouncementsFeedView: View {
     @Environment(AppState.self) private var appState
     @Environment(ToastCenter.self) private var toasts
 
     @State private var auth = AuthService.shared
-    @State private var loader = PaginatedLoader<Announcement>(per: 20)
+    @State private var store = AnnouncementsStore.shared
     @State private var showComposer = false
     @State private var editing: Announcement?
     @State private var pendingDelete: Announcement?
@@ -29,7 +34,7 @@ struct AnnouncementsFeedView: View {
     /// this way too; doing it here as well means a paginated fetch can't shuffle
     /// a pinned item below a newer one just because it landed on page two.
     private var orderedItems: [Announcement] {
-        loader.items.enumerated()
+        store.items.enumerated()
             .sorted { lhs, rhs in
                 if lhs.element.pinned != rhs.element.pinned { return lhs.element.pinned }
                 return lhs.offset < rhs.offset
@@ -48,18 +53,23 @@ struct AnnouncementsFeedView: View {
                     vettingStatusCard(user)
                 }
 
-                if loader.items.isEmpty {
-                    if loader.isLoading {
+                if store.items.isEmpty {
+                    if !store.hasLoaded {
+                        // The ONE spinner: before the first result ever exists,
+                        // and never again. Every later refresh — launch,
+                        // foreground, tab entry, pull — happens behind whatever
+                        // is already on screen (`AnnouncementsStore`). With the
+                        // launch prefetch in place a member should never reach
+                        // this branch at all; it is what a cold first run on a
+                        // slow connection falls back to.
                         ProgressView()
                             .controlSize(.large)
                             .padding(.top, Theme.Spacing.xxl)
-                    } else if let error = loader.error {
-                        EmptyStateView(
-                            icon: "wifi.exclamationmark",
-                            title: "Couldn't load announcements",
-                            message: error,
-                            actionTitle: "Try again",
-                            action: { Task { await reload() } })
+                    } else if let failure = store.failure {
+                        // Ahead of the empty state deliberately: "No
+                        // announcements yet" is a claim about the server's
+                        // answer, and a failure is not an answer.
+                        ErrorStateView(error: failure) { Task { await reload() } }
                     } else {
                         EmptyStateView(
                             icon: "megaphone",
@@ -73,7 +83,13 @@ struct AnnouncementsFeedView: View {
                 } else {
                     ForEach(orderedItems) { announcement in
                         NavigationLink(value: announcement.id) {
-                            AnnouncementRow(announcement: announcement, isAdmin: auth.isAdmin)
+                            AnnouncementRow(
+                                announcement: announcement,
+                                isAdmin: auth.isAdmin,
+                                // The store's answer, not the row's: opening an
+                                // announcement clears its dot immediately rather
+                                // than at whatever refresh happens next.
+                                isUnread: store.isUnread(announcement))
                         }
                         .buttonStyle(.plain)
                         .contextMenu { adminMenu(for: announcement) }
@@ -90,16 +106,14 @@ struct AnnouncementsFeedView: View {
                                 .padding(.top, Theme.Spacing.xs)
                             }
                         }
-                        .task {
-                            let includeDrafts = auth.isAdmin
-                            await loader.loadMoreIfNeeded(current: announcement) { page, per in
-                                try await APIClient.shared.announcementsFeed(
-                                    page: page, per: per, includeDrafts: includeDrafts)
-                            }
-                        }
+                        .task { await store.loadMoreIfNeeded(current: announcement) }
                     }
 
-                    if loader.isLoading {
+                    // `isLoadingMore`, NOT `isLoading`: the latter is also true
+                    // during a silent refresh, which would put a spinner under
+                    // the member's feed every time the app came back from the
+                    // background.
+                    if store.loader.isLoadingMore {
                         ProgressView().padding(.vertical, Theme.Spacing.lg)
                     }
                 }
@@ -111,7 +125,7 @@ struct AnnouncementsFeedView: View {
         .refreshable { await reload() }
         .navigationTitle("fwb social")
         .navigationDestination(for: String.self) { id in
-            AnnouncementDetailView(announcementId: id, preloaded: loader.items.first { $0.id == id })
+            AnnouncementDetailView(announcementId: id, preloaded: store.items.first { $0.id == id })
                 // A pushed destination is a SIBLING of this screen in the stack,
                 // not a child — the surface applied to the tab root never reaches
                 // it, and without this the announcement opened on the system's
@@ -182,11 +196,17 @@ struct AnnouncementsFeedView: View {
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
-        .task { if loader.items.isEmpty { await reload() } }
+        // Warm, not reload: `AppPrefetch` already fired this at launch, and this
+        // is only the fallback for a first entry that somehow beat it. Once the
+        // store holds a page, entering the tab does nothing visible at all.
+        .task { await store.warm() }
         // A signed-in member sees a different feed (vetted rows + read state),
         // so the feed is refetched whenever auth state flips rather than left
-        // showing the signed-out view behind a signed-in session.
-        .onChange(of: auth.isSignedIn) { _, _ in Task { await reload() } }
+        // showing the signed-out view behind a signed-in session. Sign-OUT is
+        // handled by `AppPrefetch.handleSignOut`, which clears first.
+        .onChange(of: auth.isSignedIn) { _, signedIn in
+            if signedIn { Task { await reload() } }
+        }
         // Deep link from an announcement push. Consumed once so a second drain
         // can't re-push the same detail screen.
         .onChange(of: appState.pendingAnnouncementId) { _, id in
@@ -266,13 +286,10 @@ struct AnnouncementsFeedView: View {
         AnnouncementActions(toasts: toasts).delete(announcement) { Task { await reload() } }
     }
 
+    /// Every "and then reload" in this file — pull to refresh, and the write
+    /// paths that reorder the list (pin, publish, delete). Silent by
+    /// construction: the rows on screen stay put until the new page lands.
     private func reload() async {
-        // Admins read the admin list, which is the only feed that includes
-        // drafts; everyone else reads the member or public feed.
-        let includeDrafts = auth.isAdmin
-        await loader.loadFirst { page, per in
-            try await APIClient.shared.announcementsFeed(
-                page: page, per: per, includeDrafts: includeDrafts)
-        }
+        await store.refresh()
     }
 }
