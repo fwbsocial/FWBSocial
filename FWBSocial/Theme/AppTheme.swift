@@ -490,16 +490,27 @@ private struct AppThemeRows: ViewModifier {
         let scheme = containerScheme ?? inherited
         return content
             .listRowBackground(
-                // The colour is handed over as a VIEW carrying its own appearance,
-                // not as a bare `Color`. A row background does not live in the
-                // subtree the `.fwbThemedContainer()` below writes into — it is
-                // rendered by the list, in the LIST's environment — so a plain
-                // `Theme.Colors.surface` resolved against the canvas and came out
-                // dark-translucent while the row's contents came out dark text.
-                // Channels was black-on-black in light Clubhouse for exactly one
-                // build because of it.
+                // Handed over RESOLVED — a flat colour for one appearance, not a
+                // dynamic one and not a view carrying its own environment. Two
+                // separate failures got it here, both observed:
+                //
+                //  * A bare `Theme.Colors.surface` is rendered by the LIST, in the
+                //    list's environment, which the `.fwbThemedContainer()` below
+                //    does not reach. It resolved against the canvas: Channels came
+                //    up dark-translucent boxes with dark text in them.
+                //  * Wrapping it in `.environment(\.colorScheme, scheme)` fixed
+                //    that but only while something else was also forcing a redraw.
+                //    Under Clubhouse with the appearance on **System**, the window
+                //    is pinned dark either way, so an OS light->dark switch changes
+                //    no trait at all — the row CONTENTS re-rendered from the
+                //    environment and the row BACKGROUND kept its old view. White
+                //    boxes, white text.
+                //
+                // A resolved colour is a different VALUE when the appearance
+                // changes, which is the one thing the list is guaranteed to notice.
                 appearance.appTheme.paintsOwnBackdrop
-                    ? Theme.Colors.surface.environment(\.colorScheme, scheme)
+                    ? Color(uiColor: UIColor(Theme.Colors.surface).resolvedColor(
+                        with: UITraitCollection(userInterfaceStyle: scheme == .dark ? .dark : .light)))
                     : nil)
             // The contents. Applied outside the row background so the two agree.
             //
