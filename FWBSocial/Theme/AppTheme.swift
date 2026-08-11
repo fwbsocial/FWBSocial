@@ -27,13 +27,49 @@
 //
 //   Pine · dark    the icon's background — #162B25–#204038, surfaces lifted out of it
 //   Pine · light   the same hue at daylight — a pale sage/mist ramp, pine hairlines
-//   Clubhouse      one painting, two scrims: white-leaning in light, black in dark
+//   Clubhouse      ONE canvas in both appearances; the furniture on it flips
 //
 // Every themed token is therefore built with a UIColor dynamic provider, which
 // re-resolves on the trait change the window override causes. That is what keeps
 // `Color.primary` correct without a single foreground override anywhere: in light
 // Pine the ground is pale and the system's near-black label is right; in dark Pine
 // the ground is near-black green and the system's near-white label is right.
+//
+// # Clubhouse: the canvas is constant, the furniture flips
+//
+// OWNER REDESIGN 2026-08-11. The first light Clubhouse washed the painting out
+// with a white scrim until it read as flat grey, and that is rejected. The rule
+// now is:
+//
+//   • The BACKDROP is the same dark watercolour in both appearances. Light gets a
+//     ~1.15 brightness lift baked into the asset — no white blend, no
+//     desaturation — and essentially no runtime wash on top of it.
+//   • Text sitting DIRECTLY ON that canvas — large navigation titles, the
+//     wordmark, empty and error states, section headers, captions outside a card —
+//     is light in BOTH appearances.
+//   • The FURNITURE — cards, list rows, fields, bubbles, buttons — flips with the
+//     appearance: near-opaque white with dark text in light, dark translucent in
+//     dark.
+//
+// That is implemented as an INVERTED-CONTAINER pattern rather than as a pile of
+// per-view foreground overrides:
+//
+//   1. `fwbAppThemeSurface()` (the root of every surface) forces
+//      `\.colorScheme == .dark` for its content under Clubhouse, so `.primary`,
+//      `.secondary` and every system semantic resolve light on the canvas, and it
+//      hands the bars the same style with `.toolbarColorScheme(.dark, …)`.
+//   2. Before doing that it republishes the REAL appearance — whatever the window
+//      override left in `\.colorScheme` — as `\.fwbContainerScheme`.
+//   3. `fwbThemedContainer()` reads that back and restores it locally, so a card's
+//      interior renders with the member's actual appearance and stock system
+//      semantics. In light Clubhouse that is dark-on-white; in dark it is a no-op.
+//
+// Two properties make this safe. It is a pure ENVIRONMENT operation, so it
+// composes with `UIWindow.overrideUserInterfaceStyle` (`AppearanceService`) rather
+// than fighting it — the window still decides what "the real appearance" IS, and
+// this only decides who gets to see it. And `\.fwbContainerScheme` is nil under
+// Standard and Pine, which makes `fwbThemedContainer()` a literal no-op there:
+// neither of those themes changes by a pixel.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import SwiftUI
@@ -65,13 +101,23 @@ enum AppTheme: String, CaseIterable, Identifiable {
         case .pine:
             return "The icon's pine green throughout — deep and near-black in dark, a pale sage at daylight in light."
         case .clubhouse:
-            return "The clubhouse painting behind everything, under a scrim that lightens or darkens to keep text readable in either appearance."
+            return "The clubhouse painting behind everything, in both appearances — light only lifts it. Cards, rows and fields turn white in light and dark in dark."
         }
     }
 
     /// Whether the theme draws its own backdrop, which is also the signal to
     /// stop lists and forms painting the system's opaque background over it.
     var paintsOwnBackdrop: Bool { self != .standard }
+
+    /// Whether content sitting directly on this theme's backdrop should be drawn
+    /// in a forced DARK context regardless of the member's appearance — the
+    /// inverted-container pattern described at the top of this file.
+    ///
+    /// True for Clubhouse alone, because Clubhouse alone has a canvas that stays
+    /// dark in both appearances. Pine's ground genuinely inverts (near-black green
+    /// ↔ pale sage) and Standard is the system's own, so for both of those the
+    /// stock semantics are already right and this must stay false.
+    var invertsOnCanvasContent: Bool { self == .clubhouse }
 
     // MARK: - Palette
 
@@ -128,27 +174,40 @@ enum AppTheme: String, CaseIterable, Identifiable {
                 bubbleReceived: Pine.bubble)
 
         case .clubhouse:
-            // Translucent, because the point is the painting behind them. The
-            // wash direction flips with the appearance: lightening in light,
-            // darkening in dark, so a card is always a step TOWARDS the text
-            // colour's opposite.
+            // THE FURNITURE, and the only half of Clubhouse that flips.
+            //
+            // In DARK these stay translucent, because the point is the painting
+            // showing through them. In LIGHT they are near-opaque WHITE boxes
+            // sitting on the same dark painting — owner directive 2026-08-11,
+            // "the boxes being white instead of black looks great". They are not
+            // fully opaque only so the canvas still grains through at the edges;
+            // at these alphas nothing of the painting's own contrast reaches the
+            // text inside.
+            //
+            // These values are read INSIDE `fwbThemedContainer()`, which restores
+            // the member's real appearance, so the `.light` branch is what a light
+            // member sees and `Color.primary` inside the box is the system's
+            // near-black against it.
             return Palette(
                 background: .clear,
                 surface: Color(uiColor: UIColor { tc in
                     tc.userInterfaceStyle == .dark
                         ? UIColor(white: 0, alpha: 0.34)
-                        : UIColor(white: 1, alpha: 0.62)
+                        : UIColor(white: 1, alpha: 0.96)
                 }),
+                // A shade off white rather than white: a field inside a white card
+                // has only its hairline to distinguish it otherwise, and a sunken
+                // control that reads as a gap in the card is not a control.
                 field: Color(uiColor: UIColor { tc in
                     tc.userInterfaceStyle == .dark
                         ? UIColor(white: 0, alpha: 0.26)
-                        : UIColor(white: 1, alpha: 0.50)
+                        : UIColor(white: 0.93, alpha: 0.97)
                 }),
                 hairline: Color.primary.opacity(0.14),
                 bubbleReceived: Color(uiColor: UIColor { tc in
                     tc.userInterfaceStyle == .dark
                         ? UIColor(white: 0, alpha: 0.42)
-                        : UIColor(white: 1, alpha: 0.74)
+                        : UIColor(white: 1, alpha: 0.95)
                 }))
         }
     }
@@ -218,14 +277,22 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
 // MARK: - Clubhouse backdrop
 //
-// The painting, plus the scrim that makes text legible over it.
+// THE CANVAS. One painting, drawn the same way in both appearances.
 //
-// The painting is a dark mottled pine texture — beautiful, and far too busy and
-// too dark to put `Color.primary` on directly in light appearance. The scrim is
-// two parts: a flat wash that sets the overall level, and a soft vertical
-// gradient that darkens (or, in light, brightens) the top and bottom, where the
-// navigation bar's large title and the tab bar's labels sit over it.
-
+// The asset carries two variants of the SAME dark mottled pine watercolour:
+// the original for dark, and — for light — the identical crop with a ~1.15
+// brightness multiply baked in (`ClubhouseBackdropLight@2x/@3x.jpg`, rebaked from
+// `ClubhouseTallHK.PNG` 2026-08-11). A multiply, deliberately: it lifts the level
+// without touching saturation, where the previous pass blended white into it and
+// left a flat grey that the owner rejected. Measured, the rebake holds the dark
+// original's saturation to three decimal places.
+//
+// Nothing else lightens it. There is no white wash and no white edge gradient,
+// because the text that goes over the top and bottom of this canvas — the large
+// navigation title, the tab labels — is light in BOTH appearances now (see the
+// inverted-container note at the top of the file), so both edges want DARKENING,
+// exactly as dark mode always did. Light's alphas are lower only because it is
+// starting from a brighter plate.
 private struct ClubhouseBackdrop: View {
     @Environment(\.colorScheme) private var colorScheme
 
@@ -247,22 +314,108 @@ private struct ClubhouseBackdrop: View {
             }
             .clipped()
             .overlay {
-                // Flat wash. Light mode's lift is BAKED INTO the asset now (a
-                // brightened variant of the painting), so the runtime scrim only
-                // trims the last stop of contrast instead of erasing the art —
-                // the 0.74 veil made light Clubhouse indistinguishable from a
-                // flat tint (owner feedback 2026-08-11).
-                (isDark ? Color.black : Color.white)
-                    .opacity(isDark ? 0.42 : 0.06)
+                // Flat wash — DARKENING in both, and in light barely there at all.
+                // Dark's 0.42 is what settles the painting behind a dark
+                // translucent card. Light's 0.03 is a hair off nothing: the lift
+                // it needs is already baked into the asset, and anything above
+                // ~0.04 starts erasing the art again, which is the exact failure
+                // this redesign replaces.
+                Color.black.opacity(isDark ? 0.42 : 0.03)
             }
             .overlay {
+                // Edge gradient — also DARKENING in both. The top carries the
+                // large title, the bottom carries the tab labels, and both are
+                // light text in either appearance, so both edges need to go down,
+                // never up. Light runs at roughly two thirds of dark's alpha
+                // because the plate underneath it is already brighter.
                 LinearGradient(
                     colors: isDark
                         ? [.black.opacity(0.34), .black.opacity(0.06), .black.opacity(0.40)]
-                        : [.white.opacity(0.14), .white.opacity(0.0), .white.opacity(0.16)],
+                        : [.black.opacity(0.24), .black.opacity(0.04), .black.opacity(0.28)],
                     startPoint: .top,
                     endPoint: .bottom)
             }
+    }
+}
+
+// MARK: - The canvas / container seam
+//
+// One environment value carries the whole inverted-container pattern.
+
+private struct FWBContainerSchemeKey: EnvironmentKey {
+    static let defaultValue: ColorScheme? = nil
+}
+
+private struct FWBWindowSchemeKey: EnvironmentKey {
+    static let defaultValue: ColorScheme? = nil
+}
+
+extension EnvironmentValues {
+    /// The member's actual Light / Dark / System choice, resolved, published once
+    /// at the app root by `fwbAppearanceOverride()` straight from
+    /// `AppearanceService.resolvedAppearance`.
+    ///
+    /// **Not** read from `\.colorScheme`, and this is the crux of the whole
+    /// mechanism. Under Clubhouse the WINDOW is held at dark whatever the member
+    /// picked (`AppearanceService.windowStyle` — that is what makes the UIKit
+    /// chrome sit correctly on the canvas), so `\.colorScheme` says "dark"
+    /// everywhere and has nothing left to say about the appearance. This value is
+    /// the only surviving statement of what the member actually chose, and it is
+    /// what every container flips on.
+    var fwbWindowScheme: ColorScheme? {
+        get { self[FWBWindowSchemeKey.self] }
+        set { self[FWBWindowSchemeKey.self] = newValue }
+    }
+
+    /// The appearance the WINDOW is actually in, republished by
+    /// `fwbAppThemeSurface()` at the moment it forces a dark context for
+    /// on-canvas content — and read back by `fwbThemedContainer()` to restore it
+    /// inside a card.
+    ///
+    /// `nil` means no inversion is in effect (Standard, Pine, and anything drawn
+    /// outside a themed surface), which is what makes `fwbThemedContainer()` a
+    /// no-op rather than a second opinion about the appearance.
+    var fwbContainerScheme: ColorScheme? {
+        get { self[FWBContainerSchemeKey.self] }
+        set { self[FWBContainerSchemeKey.self] = newValue }
+    }
+}
+
+/// Restores the member's real appearance inside a container.
+///
+/// Deliberately branch-free: `?? inherited` collapses to "write back what is
+/// already there" when no inversion is in effect, rather than an `if/else` that
+/// would give the wrapped content two different view identities depending on the
+/// theme (house gotcha — an `if/else` wrapper splits identity, and a card that
+/// changes identity on a theme switch loses its state and its animation).
+private struct AppThemeContainer: ViewModifier {
+    @Environment(\.fwbContainerScheme) private var containerScheme
+    @Environment(\.colorScheme) private var inherited
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.colorScheme, containerScheme ?? inherited)
+    }
+}
+
+/// The other direction: puts content back ON the canvas after something above it
+/// restored the real appearance.
+///
+/// Needed in exactly one shape, and it is a real one — a `Form`'s section HEADERS
+/// and FOOTERS. `fwbThemedRows()` has to wrap whole `Section`s, because a row
+/// background is a per-row trait that only reaches the rows if it is set on
+/// something inside the list; but a header is not in a row, it sits on the
+/// backdrop between two white boxes, and the restore would hand it the system's
+/// dark secondary label there. This pins those few labels back to the canvas.
+private struct AppThemeOnCanvas: ViewModifier {
+    @Environment(\.fwbContainerScheme) private var containerScheme
+    @Environment(\.colorScheme) private var inherited
+
+    func body(content: Content) -> some View {
+        // A non-nil container scheme is the signal that an inversion is in effect
+        // at all — and whenever one is, the canvas is dark by definition.
+        content
+            .environment(\.colorScheme, containerScheme == nil ? inherited : .dark)
     }
 }
 
@@ -270,9 +423,34 @@ private struct ClubhouseBackdrop: View {
 
 private struct AppThemeSurface: ViewModifier {
     @State private var appearance = AppearanceService.shared
+    /// What arrives in `\.colorScheme` — normally the member's Light / Dark /
+    /// System choice, already resolved by the window override this modifier sits
+    /// below.
+    @Environment(\.colorScheme) private var inheritedScheme
+    /// The truth, published at the app root. See `windowScheme`.
+    @Environment(\.fwbWindowScheme) private var rootScheme
+    /// The truth as republished by an OUTER themed surface — the fallback for a
+    /// presentation that somehow arrived without the root value.
+    @Environment(\.fwbContainerScheme) private var inheritedReal
+
+    /// The real appearance, whatever the route here was.
+    ///
+    /// `\.colorScheme` alone is wrong here in two different ways, and both were
+    /// observed. A SwiftUI sheet inherits its presenter's environment, so the two
+    /// corner-chrome sheets — presented from a root surface that has already
+    /// forced dark — read `.dark` and faithfully re-inverted an inversion: for a
+    /// LIGHT member, Settings and Profile came up with every card black and the
+    /// backdrop on the unlifted plate. And under Clubhouse `BarStyleBridge` pushes
+    /// a dark trait onto the enclosing navigation controller, which lands in
+    /// `\.colorScheme` for the whole stack. Both are this modifier's own output
+    /// coming back around; the root value never is.
+    private var windowScheme: ColorScheme { rootScheme ?? inheritedReal ?? inheritedScheme }
 
     func body(content: Content) -> some View {
         let theme = appearance.appTheme
+        let inverts = theme.invertsOnCanvasContent
+        let canvasScheme: ColorScheme = inverts ? .dark : windowScheme
+
         content
             // Lists and forms paint an opaque `systemGroupedBackground` of their
             // own, which covers a backdrop completely. This does NOT cross a
@@ -280,21 +458,55 @@ private struct AppThemeSurface: ViewModifier {
             // stayed opaque and the backdrop showed only in the strip above it —
             // which is why the modifier goes on the content INSIDE each stack.
             .scrollContentBackground(theme.paintsOwnBackdrop ? .hidden : .automatic)
+            // Hand the containers the real appearance BEFORE overriding it, then
+            // override it. Order matters only in that both writes have to be
+            // inside the same subtree as the content; they are.
+            .environment(\.fwbContainerScheme, inverts ? windowScheme : nil)
+            .environment(\.colorScheme, canvasScheme)
             // `.background` rather than wrapping in a `ZStack`: it leaves layout
             // untouched, and `.navigationTitle` / `.toolbar` declared by the
             // wrapped screen keep reaching the stack above it.
+            //
+            // The backdrop is pinned to the WINDOW's appearance, not the canvas's.
+            // It is the one thing that must not be inverted: `ClubhouseBackdrop`
+            // picks its asset variant off `\.colorScheme`, and forcing dark here
+            // would hand a light member the unlifted plate.
             .background {
-                theme.backdrop.ignoresSafeArea()
+                theme.backdrop
+                    .environment(\.colorScheme, windowScheme)
+                    .ignoresSafeArea()
             }
     }
 }
 
 private struct AppThemeRows: ViewModifier {
     @State private var appearance = AppearanceService.shared
+    @Environment(\.fwbContainerScheme) private var containerScheme
+    @Environment(\.colorScheme) private var inherited
 
     func body(content: Content) -> some View {
-        content
-            .listRowBackground(appearance.appTheme.paintsOwnBackdrop ? Theme.Colors.surface : nil)
+        // A row IS a container: in light Clubhouse it is a white box and its
+        // contents have to be dark against it.
+        let scheme = containerScheme ?? inherited
+        return content
+            .listRowBackground(
+                // The colour is handed over as a VIEW carrying its own appearance,
+                // not as a bare `Color`. A row background does not live in the
+                // subtree the `.fwbThemedContainer()` below writes into — it is
+                // rendered by the list, in the LIST's environment — so a plain
+                // `Theme.Colors.surface` resolved against the canvas and came out
+                // dark-translucent while the row's contents came out dark text.
+                // Channels was black-on-black in light Clubhouse for exactly one
+                // build because of it.
+                appearance.appTheme.paintsOwnBackdrop
+                    ? Theme.Colors.surface.environment(\.colorScheme, scheme)
+                    : nil)
+            // The contents. Applied outside the row background so the two agree.
+            //
+            // This also reaches section headers and footers, which are NOT in a
+            // row and do not want it — see `fwbOnCanvas()`, which the two Form
+            // screens put on theirs.
+            .fwbThemedContainer()
     }
 }
 
@@ -322,7 +534,36 @@ extension View {
     /// note on `scrollContentBackground` above. In practice that means the four
     /// tab roots in `RootTabView` and the corner-chrome sheet wrapper, all of
     /// which are shell infrastructure; no feature screen applies this.
+    ///
+    /// Under Clubhouse this is also where the inverted-container pattern starts:
+    /// everything below it is drawn as if the appearance were dark, because
+    /// everything below it is sitting on a dark painting. See the top of this file.
     func fwbAppThemeSurface() -> some View {
         modifier(AppThemeSurface())
+    }
+
+    /// Marks this view as a CONTAINER — a card, a row, a field, a bubble, a
+    /// button — and restores the member's real appearance inside it.
+    ///
+    /// Apply it to the WHOLE composed container, background and contents
+    /// together, never to the contents alone: the surface colour and the text on
+    /// it have to be resolved in the same appearance or the box is white with
+    /// white text in it. In practice that means it goes last, after
+    /// `.background(…)` and any `.overlay(…)` border.
+    ///
+    /// A no-op unless a themed surface above it declared an inversion, which
+    /// only Clubhouse does — Standard and Pine are untouched by design.
+    func fwbThemedContainer() -> some View {
+        modifier(AppThemeContainer())
+    }
+
+    /// The inverse: keeps this view on the CANVAS's appearance even though
+    /// something above it restored the real one.
+    ///
+    /// One use, and a real one — a `Form`'s section headers and footers, which
+    /// `fwbThemedRows()` unavoidably wraps along with the rows but which sit on
+    /// the backdrop rather than in a white box. See `AppThemeOnCanvas`.
+    func fwbOnCanvas() -> some View {
+        modifier(AppThemeOnCanvas())
     }
 }

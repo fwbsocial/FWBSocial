@@ -102,6 +102,15 @@ final class AppearanceService {
     }
 
     private(set) var iconPreference: IconPreference
+
+    /// The SYSTEM's appearance, independent of anything this app overrides.
+    ///
+    /// Read from the window SCENE rather than from a window: `overrideUserInterfaceStyle`
+    /// is a window-level property and does not propagate upwards, so the scene's
+    /// trait collection keeps telling the truth even while every window in it is
+    /// pinned. Kept fresh by `observeSystemAppearance()`.
+    private(set) var systemScheme: ColorScheme = .light
+
     var lastIconError: String?
 
     private init() {
@@ -173,19 +182,81 @@ final class AppearanceService {
     // covers and alerts are all presented within the same window, so they
     // inherit it live with no per-view plumbing at all.
 
-    /// Push the current theme onto every window in the app.
+    /// The member's appearance choice, resolved to a concrete scheme.
+    ///
+    /// The value every CONTAINER flips on — cards, rows, fields, bubbles — and
+    /// the value `\.fwbWindowScheme` carries. Deliberately independent of
+    /// `\.colorScheme`, which under Clubhouse is pinned to dark and can no longer
+    /// answer the question. See `windowStyle`.
+    var resolvedAppearance: ColorScheme {
+        switch theme {
+        case .light:  return .light
+        case .dark:   return .dark
+        case .system: return systemScheme
+        }
+    }
+
+    /// The interface style the WINDOW is held at.
+    ///
+    /// Normally the member's choice, exactly as before. Under **Clubhouse** it is
+    /// always `.dark`, and that is a deliberate part of the 2026-08-11 redesign
+    /// rather than the theme overriding the appearance toggle: Clubhouse's canvas
+    /// is the same dark painting in both appearances, and the app's UIKit chrome —
+    /// the navigation bar's large title, the tab bar's labels and glass, the
+    /// status bar — sits directly ON that canvas with no card under it.
+    ///
+    /// It is here rather than in SwiftUI because nothing in SwiftUI reaches that
+    /// chrome. Measured, in this order:
+    /// `.toolbarColorScheme(.dark, for: .navigationBar, .tabBar)` had no effect —
+    /// `NavigationAppearance` installs its own appearance objects through the
+    /// global proxy for the Sue Ellen large title, and SwiftUI does not replace
+    /// them. Overriding `overrideUserInterfaceStyle` on the enclosing
+    /// `UINavigationController` and `UITabBarController`, and then on their bar
+    /// views, DID take (verified: the bars' own trait collections went dark) and
+    /// still changed nothing on screen — iOS 26's glass chrome does not repaint
+    /// from it. The window is the level that works.
+    ///
+    /// The appearance toggle keeps its full meaning: under Clubhouse it drives the
+    /// FURNITURE instead of the chrome — white cards with dark text in light, dark
+    /// translucent ones in dark — via `resolvedAppearance`. Standard and Pine are
+    /// untouched.
+    var windowStyle: UIUserInterfaceStyle {
+        appTheme.invertsOnCanvasContent ? .dark : theme.uiStyle
+    }
+
+    /// Keep `systemScheme` in step with the OS.
+    ///
+    /// Registered on the SCENE, whose traits this app never overrides. Called once
+    /// from `applyToWindows()`, which runs on appear and on every window becoming
+    /// visible, so it re-arms itself for a scene that arrives later.
+    private var isObservingSystemAppearance = false
+
+    private func observeSystemAppearance(_ scene: UIWindowScene) {
+        let live: ColorScheme = scene.traitCollection.userInterfaceStyle == .dark ? .dark : .light
+        if systemScheme != live { systemScheme = live }
+
+        guard !isObservingSystemAppearance else { return }
+        isObservingSystemAppearance = true
+        scene.registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (scene: UIWindowScene, _) in
+            MainActor.assumeIsolated {
+                let updated: ColorScheme = scene.traitCollection.userInterfaceStyle == .dark ? .dark : .light
+                guard AppearanceService.shared.systemScheme != updated else { return }
+                AppearanceService.shared.systemScheme = updated
+                AppearanceService.shared.applyToWindows(animated: true)
+            }
+        }
+    }
+
+    /// Push the current style onto every window in the app.
     ///
     /// `animated` cross-dissolves the change, which is what the system itself
     /// does when the real setting flips; an instant swap of every colour on
     /// screen reads as a glitch.
     func applyToWindows(animated: Bool = false) {
-        // The appearance is the ONLY thing that decides the interface style. The
-        // app theme composes with it rather than overriding it — every themed
-        // token is a dynamic colour with a light and a dark value, so all six
-        // theme × appearance combinations are real. See AppTheme.swift.
-        let style = theme.uiStyle
+        let style = windowStyle
         for scene in UIApplication.shared.connectedScenes {
             guard let windowScene = scene as? UIWindowScene else { continue }
+            observeSystemAppearance(windowScene)
             for window in windowScene.windows where window.overrideUserInterfaceStyle != style {
                 guard animated else {
                     window.overrideUserInterfaceStyle = style
@@ -206,8 +277,20 @@ private struct AppearanceWindowOverride: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // The member's choice, carried down for the surfaces that need to know
+            // it. Taken from the service and NOT from `\.colorScheme`, which under
+            // Clubhouse is pinned to dark at the window and would report the
+            // theme's opinion rather than the member's. See AppTheme.swift's
+            // inverted-container note.
+            .environment(\.fwbWindowScheme, appearance.resolvedAppearance)
             .onAppear { appearance.applyToWindows() }
             .onChange(of: appearance.theme) { _, _ in
+                appearance.applyToWindows(animated: true)
+            }
+            // The app theme now has a say in the window's style — Clubhouse pins it
+            // dark — so switching theme has to re-apply it, or the chrome keeps the
+            // previous theme's until something else pokes it.
+            .onChange(of: appearance.appTheme) { _, _ in
                 appearance.applyToWindows(animated: true)
             }
             // Windows are created after this view appears, and go on being
