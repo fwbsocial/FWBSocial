@@ -75,10 +75,10 @@ private struct RootSurfaceChrome: ViewModifier {
                 }
             }
             .sheet(isPresented: $isPresentingProfile) {
-                NavigationStack { ProfileView() }
+                DismissableSheet { ProfileView() }
             }
             .sheet(isPresented: $isPresentingSettings) {
-                NavigationStack { SettingsView() }
+                DismissableSheet { SettingsView() }
             }
             // A friend-request push has no screen of its own; the friends list lives
             // inside Profile, so the route opens that sheet.
@@ -152,6 +152,29 @@ extension View {
                 }
         } else {
             self
+        }
+    }
+}
+
+// MARK: - Sheet wrapper with an explicit Done button
+//
+// Corner-chrome sheets (Profile, Settings) are dismissable by swipe, but an
+// explicit Done matters for discoverability, VoiceOver, and Switch Control —
+// owner directive 2026-08-11.
+struct DismissableSheet<Content: View>: View {
+    @Environment(\.dismiss) private var dismiss
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        NavigationStack {
+            content
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Done") { dismiss() }
+                            .fontWeight(.semibold)
+                            .accessibilityIdentifier("sheet.done")
+                    }
+                }
         }
     }
 }

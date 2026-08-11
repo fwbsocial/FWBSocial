@@ -238,6 +238,11 @@ final class ScreenshotCaptureTests: XCTestCase {
         // Dismiss the keyboard so the thread, not the keyboard, is the screenshot.
         dismissKeyboard()
         settle(3)
+        // Both sides have to be visible in the frame, or this is not the shot.
+        XCTAssertTrue(app.staticTexts[Self.adaReplies[Self.adaReplies.count - 1]].exists,
+                      "Ada's reply should be on screen. Tree:\n\(app.debugDescription)")
+        XCTAssertTrue(latestIncoming.exists, "Mika's message should still be on screen")
+        XCTAssertFalse(app.buttons["Report"].exists, "no action menu should be covering the thread")
         shoot("04-chat")
     }
 
@@ -324,10 +329,21 @@ final class ScreenshotCaptureTests: XCTestCase {
     }
 
     private func dismissKeyboard() {
-        if app.keyboards.element.exists {
-            // The app dismisses on a background tap; aim well clear of every row.
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)).tap()
-            _ = app.keyboards.element.waitForExistence(timeout: 2)
+        guard app.keyboards.element.exists else { return }
+        // Tap the NAVIGATION BAR, not the thread.
+        //
+        // A tap at a fraction of the screen height looked like empty space with
+        // three messages in the thread and was a message bubble with five — and a
+        // tap on a bubble opens `MessageActionMenu`, so the capture came out with
+        // the react/Reply/Copy/Report sheet over half the screen. The bar is the
+        // one region that is never a bubble.
+        app.navigationBars.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        settle(1)
+
+        // And if something did open, close it rather than photographing it.
+        if app.buttons["Copy"].exists || app.buttons["Report"].exists {
+            app.swipeDown(velocity: .fast)
+            settle(2)
         }
     }
 
