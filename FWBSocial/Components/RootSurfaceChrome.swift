@@ -50,22 +50,25 @@ private struct RootSurfaceChrome: ViewModifier {
                 // own face before they have one. Home already carries its own
                 // "Sign in" affordance for that case.
                 if let user = auth.user {
+                    // The avatar IS the chrome (owner directive 2026-08-11): no
+                    // glass backing at all — the circle itself is the control,
+                    // sized to match the other chrome bubbles. `.circle` border
+                    // shape still couldn't stop the backing reading as a pill
+                    // (the glass pads horizontally); hiding the shared background
+                    // removes the backing rather than fighting its geometry.
                     ToolbarItem(placement: .topBarLeading) {
                         Button {
                             isPresentingProfile = true
                         } label: {
-                            // The avatar IS the button — the member's own face reads
-                            // as "you" far faster than a person glyph does.
                             AvatarView(name: user.displayName, url: user.avatarUrl)
-                                .frame(width: 30, height: 30)
+                                .frame(width: 40, height: 40)
+                                .clipShape(Circle())
                         }
-                        // The system wraps toolbar items in a glass CAPSULE, which
-                        // reads as a pill around a circular avatar (owner report).
-                        // A circular border shape makes the backing match the face.
-                        .buttonBorderShape(.circle)
+                        .buttonStyle(.plain)
                         .accessibilityLabel("Your profile")
                         .accessibilityIdentifier("chrome.profile")
                     }
+                    .sharedBackgroundVisibility(.hidden)
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
