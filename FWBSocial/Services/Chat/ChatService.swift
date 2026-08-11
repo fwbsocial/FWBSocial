@@ -53,7 +53,10 @@ final class ChatService {
     /// Peers whose safety number changed and who need explicit re-acceptance.
     private(set) var pendingKeyChanges: [UUID: [ChatDeviceDTO]] = [:]
 
-    private(set) var typingUserIds: Set<UUID> = []
+    /// Typing indicators, scoped BY CONVERSATION. A flat set would show "Alex is
+    /// typing" in the thread you have open because Alex is typing in a different
+    /// one — the frame carries a conversation id precisely so it doesn't have to.
+    private(set) var typingByConversation: [UUID: Set<UUID>] = [:]
     private(set) var isLoadingConversations = false
     private(set) var hasMoreByConversation: [UUID: Bool] = [:]
 
@@ -296,12 +299,13 @@ final class ChatService {
             await ingest(dto)
 
         case ChatWSType.typing:
-            guard let senderId = frame.senderId, senderId != currentUserId else { return }
+            guard let senderId = frame.senderId, senderId != currentUserId,
+                  let conversationId = frame.conversationId else { return }
             if frame.values["isTyping"] == "false" {
-                typingUserIds.remove(senderId)
+                typingByConversation[conversationId]?.remove(senderId)
             } else {
-                typingUserIds.insert(senderId)
-                scheduleTypingClear(senderId)
+                typingByConversation[conversationId, default: []].insert(senderId)
+                scheduleTypingClear(senderId, in: conversationId)
             }
 
         case ChatWSType.read, ChatWSType.delivered:
@@ -342,13 +346,21 @@ final class ChatService {
         }
     }
 
-    private func scheduleTypingClear(_ userId: UUID) {
+    /// A typing frame has no "stopped" guarantee — the sender may background the
+    /// app mid-word — so the indicator self-expires rather than waiting for a frame
+    /// that may never arrive.
+    private func scheduleTypingClear(_ userId: UUID, in conversationId: UUID) {
         typingClearTask?.cancel()
         typingClearTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(6))
             guard !Task.isCancelled else { return }
-            self?.typingUserIds.remove(userId)
+            self?.typingByConversation[conversationId]?.remove(userId)
         }
+    }
+
+    /// Who is typing in a conversation right now, excluding us.
+    func typingMembers(in conversationId: UUID) -> [UUID] {
+        Array(typingByConversation[conversationId] ?? []).filter { $0 != currentUserId }
     }
 
     // MARK: - Conversations

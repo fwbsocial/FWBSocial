@@ -20,6 +20,15 @@ enum PendingPush: Sendable, Equatable {
     /// An announcement push carries `announcement_id`; tapping it opens that
     /// announcement's detail screen, not just the Home tab (PLAN.md §4.1).
     case announcement(id: String)
+    /// A chat push carries `conversation_id` and `message_id` and nothing else —
+    /// it CANNOT carry a preview, because the server holds ciphertext (§4.3.5).
+    /// The body the member reads is produced by the notification extension, on
+    /// device; this is only the tap route.
+    case conversation(id: UUID)
+    /// A second device registered and is waiting to be approved. This push is the
+    /// backstop, not an optimisation: the WebSocket `device_added` frame reaches
+    /// only a foregrounded device (§4.3.3).
+    case devices
 }
 
 extension Notification.Name {
@@ -155,12 +164,21 @@ final class PushCoordinator {
             } else {
                 enqueue(.tab(.home))
             }
-        case "fwb_chat_message":
-            enqueue(.tab(.chat))
+        // The chat categories are the server's own literals — `ChatPushService`
+        // sends `CHAT_MESSAGE`, `ChatDeviceController` sends `DEVICE_APPROVAL`,
+        // and `FriendsController` sends `FRIEND_REQUEST` / `FRIEND_ACCEPTED`.
+        case "CHAT_MESSAGE":
+            if let raw = userInfo["conversation_id"], let id = UUID(uuidString: raw) {
+                enqueue(.conversation(id: id))
+            } else {
+                enqueue(.tab(.chat))
+            }
+        case "DEVICE_APPROVAL":
+            enqueue(.devices)
+        case "FRIEND_REQUEST", "FRIEND_ACCEPTED":
+            enqueue(.tab(.profile))
         case "fwb_channel_post":
             enqueue(.tab(.channels))
-        case "fwb_friend_request":
-            enqueue(.tab(.profile))
         default:
             // A push with no category but an announcement id is still routable —
             // the payload is what matters, the category is just a hint.
@@ -186,6 +204,11 @@ final class PushCoordinator {
             appState.selectedTab = tab
         case .announcement(let id):
             appState.openAnnouncement(id: id)
+        case .conversation(let id):
+            appState.openConversation(id: id)
+        case .devices:
+            appState.selectedTab = .chat
+            appState.isPresentingDevices = true
         }
     }
 }

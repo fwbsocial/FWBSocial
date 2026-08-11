@@ -11,6 +11,7 @@ import SwiftUI
 struct RootTabView: View {
     @Environment(AppState.self) private var appState
     @State private var auth = AuthService.shared
+    @State private var chat = ChatService.shared
 
     var body: some View {
         @Bindable var appState = appState
@@ -39,8 +40,17 @@ struct RootTabView: View {
 
             if FWBTab.chat.isEnabled {
                 Tab(FWBTab.chat.title, systemImage: FWBTab.chat.systemImage, value: FWBTab.chat) {
-                    NavigationStack { memberOnly(ChatListView(), tab: .chat) }
+                    // The path lives in AppState so a chat push — or a thread
+                    // started from inside the new-conversation sheet — can push a
+                    // thread onto a tab that was never opened.
+                    NavigationStack(path: $appState.chatPath) {
+                        memberOnly(ChatListView(), tab: .chat)
+                            .navigationDestination(for: UUID.self) { conversationId in
+                                ChatThreadView(conversationId: conversationId)
+                            }
+                    }
                 }
+                .badge(chat.unreadTotal)
             }
 
             Tab(FWBTab.profile.title, systemImage: FWBTab.profile.systemImage, value: FWBTab.profile) {
@@ -56,6 +66,32 @@ struct RootTabView: View {
         }
         .tint(Theme.Colors.brand)
         .sheet(isPresented: $appState.isPresentingAuth) { AuthFlowView() }
+        .sheet(isPresented: $appState.isPresentingDevices) {
+            NavigationStack { DeviceManagementView() }
+        }
+        // A conversation queued from a push, or from the new-conversation sheet
+        // (which cannot push onto the list's own stack from inside itself).
+        // Consumed and cleared, so a second drain can't re-navigate.
+        .onChange(of: appState.pendingConversationId) { _, id in
+            guard let id else { return }
+            appState.pendingConversationId = nil
+            appState.selectedTab = .chat
+            if appState.chatPath.last != id { appState.chatPath.append(id) }
+        }
+        .onChange(of: auth.isSignedIn) { _, signedIn in
+            if signedIn {
+                Task { await chat.start() }
+            } else {
+                chat.handleSignOut()
+            }
+        }
+        .task {
+            // Session restore already ran in `FWBSocialApp`; if it produced a
+            // session, enrol this device now rather than waiting for the member to
+            // open the Chat tab. `PUT /api/chat/devices` sits outside the vetting
+            // gate precisely so this can happen at first login (§4.6).
+            if auth.isSignedIn { await chat.start() }
+        }
     }
 
     /// Member-only tabs: the real screen when signed in, an honest prompt when

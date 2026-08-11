@@ -300,6 +300,19 @@ final class AuthService {
         try await updateProfile(ProfileUpdate(displayName: displayName))
     }
 
+    /// §4.4's inbox policy. Flipping to `friends_only` blocks NEW conversations
+    /// only — existing threads are grandfathered, and the settings copy says so.
+    func updateProfile(inboxPolicy: String) async throws {
+        try await updateProfile(ProfileUpdate(inboxPolicy: inboxPolicy))
+    }
+
+    /// §4.3.5's preview flag. The caller ALSO mirrors it into the App Group; the
+    /// column alone is inert, because the notification extension cannot read
+    /// Postgres and the server has ciphertext with nothing to redact.
+    func updateProfile(hideMessagePreviews: Bool) async throws {
+        try await updateProfile(ProfileUpdate(hideMessagePreviews: hideMessagePreviews))
+    }
+
     func uploadAvatar(_ imageData: Data, fileName: String = "avatar.jpg", mimeType: String = "image/jpeg") async throws {
         let _: EmptyResponse = try await api.upload("/api/auth/avatar", fileData: imageData, fileName: fileName, mimeType: mimeType)
         await reloadUser()

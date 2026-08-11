@@ -63,18 +63,19 @@ nonisolated enum FWBFeatures {
     static let channels = true
     /// Phase 2/7 — Luma events and post-event friending (§4.5, §7).
     static let events = false
-    /// Phase 6 — E2EE chat (§4.3).
-    static let chat = false
+    /// Phase 6 — E2EE chat (§4.3). **Live**: device enrolment, 1:1 and group
+    /// threads, receipts, the offline outbox and the history handoff all run
+    /// against deployed routes.
+    static let chat = true
 
     /// Phase 6/7 — the friend graph (commissioner decision 9's second discovery
-    /// path). **The UI ships inert on purpose**: `AuthorProfileSheet` already
-    /// draws the request button, and `POST /api/friends/requests` does not exist
-    /// yet. Building the surface now and flipping one constant later beats
-    /// writing it under time pressure alongside chat.
+    /// path). **Live** — `/api/friends/*` is deployed, and chat needs it: with
+    /// `inbox_policy` defaulting to `friends_only`, nobody can message anybody
+    /// without a friend graph.
     ///
     /// Note this is only the *first* of two gates — the target's own
     /// `allowsFriendRequests` decides per-person even once this is on.
-    static let friendRequests = false
+    static let friendRequests = true
 }
 
 extension FWBTab {
@@ -107,8 +108,22 @@ final class AppState {
     /// The feed consumes it and clears it, so a second drain can't re-navigate.
     var pendingAnnouncementId: String?
 
+    /// The Chat tab's `NavigationStack` path — conversation ids. Owned here for the
+    /// same reason as `announcementPath`: a chat notification must be able to push a
+    /// thread onto a tab the member has not visited.
+    var chatPath: [UUID] = []
+
+    /// A conversation to open once the presenting sheet is out of the way. Set by
+    /// `NewConversationView` (which cannot push onto the list's stack from inside its
+    /// own sheet) and by push handling; the list consumes and clears it.
+    var pendingConversationId: UUID?
+
     /// True while the auth sheet should be up. Any screen can raise it.
     var isPresentingAuth = false
+
+    /// Raised by a `DEVICE_APPROVAL` push — a second device is waiting, and that
+    /// push exists because the WebSocket frame only reaches a foregrounded app.
+    var isPresentingDevices = false
 
     private init() {}
 
@@ -116,5 +131,13 @@ final class AppState {
     func openAnnouncement(id: String) {
         selectedTab = .home
         pendingAnnouncementId = id
+    }
+
+    /// Route to a conversation from a notification tap. The APNs payload carries the
+    /// conversation id as metadata — that and the message id are all it can carry,
+    /// since the server cannot read the message itself.
+    func openConversation(id: UUID) {
+        selectedTab = .chat
+        pendingConversationId = id
     }
 }

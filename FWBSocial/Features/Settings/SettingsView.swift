@@ -21,6 +21,7 @@ struct SettingsView: View {
             appearanceSection
             if auth.isSignedIn {
                 privacySection
+                chatSection
                 notificationsSection
                 safetySection
             }
@@ -59,6 +60,58 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Chat
+    //
+    // Inbox privacy is §4.4's setting. E2EE does not touch it: conversation
+    // membership, block rows and `inbox_policy` are metadata the server owns, and
+    // it enforces them at conversation-create and add-member.
+    //
+    // `hideMessagePreviews` is the odd one out on this screen: it is the ONLY
+    // setting whose enforcement is entirely client-side, because the server has
+    // ciphertext and nothing to redact (§4.3.5). Saving it does two things —
+    // persists the column AND mirrors it into the App Group, without which the
+    // column is inert and the toggle silently does nothing.
+
+    @ViewBuilder
+    private var chatSection: some View {
+        Section {
+            Picker("Who can message you", selection: Binding(
+                get: { InboxPolicy(rawValue: auth.user?.inboxPolicy ?? "") ?? .friendsOnly },
+                set: { newValue in Task { await saveInboxPolicy(newValue) } }
+            )) {
+                ForEach(InboxPolicy.allCases) { policy in
+                    Text(policy.label).tag(policy)
+                }
+            }
+            .accessibilityIdentifier("settings.inboxPolicy")
+
+            Toggle("Hide message previews", isOn: Binding(
+                get: { auth.user?.hideMessagePreviews ?? false },
+                set: { newValue in Task { await saveHidePreviews(newValue) } }
+            ))
+            .accessibilityIdentifier("settings.hidePreviews")
+
+            NavigationLink {
+                DeviceManagementView()
+            } label: {
+                Label("Devices", systemImage: "iphone.gen3")
+            }
+
+            NavigationLink {
+                FriendsView()
+            } label: {
+                Label("Friends", systemImage: "person.2")
+            }
+        } header: {
+            Text("Chat")
+        } footer: {
+            Text(
+                (InboxPolicy(rawValue: auth.user?.inboxPolicy ?? "") ?? .friendsOnly).explanation
+                    + "\n\nWith previews hidden, notifications say “New message” and nothing else — the decryption that produces a preview happens on this device, so turning it off really does stop it happening."
+            )
+        }
+    }
+
     // MARK: - Notifications
 
     @ViewBuilder
@@ -67,15 +120,43 @@ struct SettingsView: View {
             Toggle("Announcements", isOn: Binding(
                 get: { prefs?.notifyAnnouncements ?? true },
                 set: { savePrefs { $0.notifyAnnouncements = $1 }($0) }))
+            Toggle("Messages", isOn: Binding(
+                get: { prefs?.notifyDm ?? true },
+                set: { savePrefs { $0.notifyDm = $1 }($0) }))
+            Toggle("Friend requests", isOn: Binding(
+                get: { prefs?.notifyFriendRequests ?? true },
+                set: { savePrefs { $0.notifyFriendRequests = $1 }($0) }))
             Toggle("New posts in channels", isOn: Binding(
                 get: { prefs?.notifyChannelPosts ?? true },
                 set: { savePrefs { $0.notifyChannelPosts = $1 }($0) }))
         } header: {
             Text("Notifications")
         } footer: {
-            Text("Channel notifications are throttled and grouped, and you can mute any single channel from its own screen.")
+            Text("Channel notifications are throttled and grouped, and you can mute any single channel or conversation from its own screen.")
         }
         .disabled(prefs == nil)
+    }
+
+    // MARK: - Chat preference plumbing
+
+    private func saveInboxPolicy(_ policy: InboxPolicy) async {
+        do {
+            try await auth.updateProfile(inboxPolicy: policy.rawValue)
+        } catch {
+            toasts.error("Couldn't save that setting.")
+        }
+    }
+
+    private func saveHidePreviews(_ hide: Bool) async {
+        // Mirror FIRST so the extension is right even if the network write is slow;
+        // the column and the mirror are reconciled on the next session restore.
+        AppGroupStore.hideMessagePreviews = hide
+        do {
+            try await auth.updateProfile(hideMessagePreviews: hide)
+        } catch {
+            AppGroupStore.hideMessagePreviews = !hide
+            toasts.error("Couldn't save that setting.")
+        }
     }
 
     // MARK: - Safety
