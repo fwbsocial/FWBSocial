@@ -64,6 +64,10 @@ final class ChannelsStore {
         // prompt anyway. A pending member is NOT skipped: the 403 is how the tab
         // gets the server's sentence, and it is the whole content of the state
         // they see.
+        // Never fetch while session restore is still in flight: "signed out" and
+        // "not known yet" are different answers, and acting on the second is what
+        // produced the Feed's empty-at-launch bug (see `AnnouncementsStore.warm`).
+        guard AuthService.shared.didRestoreSession else { return }
         guard AuthService.shared.isSignedIn else { return }
         guard !isRefreshing else { return }
         isRefreshing = true

@@ -200,13 +200,12 @@ struct AnnouncementsFeedView: View {
         // is only the fallback for a first entry that somehow beat it. Once the
         // store holds a page, entering the tab does nothing visible at all.
         .task { await store.warm() }
-        // A signed-in member sees a different feed (vetted rows + read state),
-        // so the feed is refetched whenever auth state flips rather than left
-        // showing the signed-out view behind a signed-in session. Sign-OUT is
-        // handled by `AppPrefetch.handleSignOut`, which clears first.
-        .onChange(of: auth.isSignedIn) { _, signedIn in
-            if signedIn { Task { await reload() } }
-        }
+        // NOTE: no `onChange(of: auth.isSignedIn)` here any more. A signed-in
+        // member does see a different feed — public rows become member rows and
+        // gain read state — but refetching on that transition is
+        // `AppPrefetch`'s job now (`signedIn()` / `handleSignOut()`), and it has
+        // to be: this view is only alive when the Home tab is, and the feed must
+        // be right whether or not the member happened to be looking at it.
         // Deep link from an announcement push. Consumed once so a second drain
         // can't re-push the same detail screen.
         .onChange(of: appState.pendingAnnouncementId) { _, id in

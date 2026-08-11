@@ -47,12 +47,32 @@ enum AppPrefetch {
     /// the launch task share one entry point.
     static func warmAll() {
         logger.debug("warming all tabs")
+        // Whatever the previous run of this app cached on disk belongs to
+        // whoever was signed in then — see `FWBHTTP.clearSharedCache`.
+        FWBHTTP.clearSharedCache()
         // Separate tasks, deliberately: a task group would still be one task from
         // the caller's point of view, and one slow route would hold the others'
         // results back from the screen. These publish independently, so whichever
         // tab the member taps first shows whatever has landed.
         Task { await ChatService.shared.start() }
         Task { await AnnouncementsStore.shared.warm() }
+        Task { await ChannelsStore.shared.warm() }
+        Task { await EventsStore.shared.warm() }
+        Task { await BlockStore.shared.loadIfNeeded() }
+    }
+
+    /// Signing in.
+    ///
+    /// Not just `warmAll()`: the Home feed may already hold a page, because it
+    /// is the one surface that renders signed out — and that page is the PUBLIC
+    /// feed, a different list from the one this member is entitled to. `warm()`
+    /// would see `hasLoaded` and do nothing, so the announcements store is asked
+    /// to refresh outright while the other three, which have nothing yet, warm.
+    static func signedIn() {
+        logger.notice("signed in — rewarming every tab")
+        FWBHTTP.clearSharedCache()
+        Task { await AnnouncementsStore.shared.refresh() }
+        Task { await ChatService.shared.start() }
         Task { await ChannelsStore.shared.warm() }
         Task { await EventsStore.shared.warm() }
         Task { await BlockStore.shared.loadIfNeeded() }
@@ -112,6 +132,9 @@ enum AppPrefetch {
     /// screen, and the public feed is a different list from the one that was on
     /// screen a moment ago.
     static func handleSignOut() {
+        // First, and before anything can refetch: a cached response keyed only by
+        // URL would otherwise be handed to whoever signs in next (bug 8CC9EC4F).
+        FWBHTTP.clearSharedCache()
         ChatService.shared.handleSignOut()
         AnnouncementsStore.shared.handleSignOut()
         ChannelsStore.shared.handleSignOut()

@@ -81,10 +81,23 @@ final class AnnouncementsStore {
     /// Launch prefetch. Does nothing once there is data — a second warm is a
     /// refresh's job, not this one's.
     ///
-    /// **No auth guard.** The Home feed renders signed out (PLAN.md §4.1) and
-    /// `APIClient.announcementsFeed` picks the public route when there's no
-    /// session, so this is the one store that warms for a signed-out visitor too.
+    /// **The one thing it will not do is load before it knows who is asking.**
+    ///
+    /// Owner bug, 2026-08-11: at cold launch the Feed sometimes came up empty and
+    /// stayed empty through a pull-to-refresh, until the member left the tab and
+    /// came back. The feed's initial load was racing session restore — it fired
+    /// unauthenticated, got the PUBLIC route, and a member (or an admin with a
+    /// draft) whose content is not public saw nothing. `didRestoreSession` is the
+    /// gate: signed out is a fine answer, *unknown* is not, and this returns
+    /// until the difference is settled. `AppPrefetch` fires immediately after
+    /// restore resolves, which is what makes the guard a sequencing tool rather
+    /// than a way to never load at all.
+    ///
+    /// There is no *signed-in* guard, though: the Home feed renders signed out by
+    /// design (PLAN.md §4.1, Guideline 2.1) and `announcementsFeed` picks the
+    /// public route when there is genuinely no session.
     func warm() async {
+        guard AuthService.shared.didRestoreSession else { return }
         guard !hasLoaded else { return }
         await refresh()
     }

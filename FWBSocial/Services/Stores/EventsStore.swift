@@ -47,6 +47,10 @@ final class EventsStore {
     }
 
     func refresh() async {
+        // Never fetch while session restore is still in flight: "signed out" and
+        // "not known yet" are different answers, and acting on the second is what
+        // produced the Feed's empty-at-launch bug (see `AnnouncementsStore.warm`).
+        guard AuthService.shared.didRestoreSession else { return }
         guard AuthService.shared.isSignedIn else { return }
         guard !isRefreshing else { return }
         isRefreshing = true

@@ -137,7 +137,7 @@ struct RootTabView: View {
         // session restore rather than racing it — see `AppPrefetch`.
         .onChange(of: auth.isSignedIn) { _, signedIn in
             if signedIn {
-                AppPrefetch.warmAll()
+                AppPrefetch.signedIn()
             } else {
                 AppPrefetch.handleSignOut()
             }
