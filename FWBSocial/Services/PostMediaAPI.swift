@@ -254,7 +254,7 @@ enum PostMediaPreparer {
         request.httpMethod = "PUT"
         request.setValue(contentType, forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 300
-        let (_, response) = try await URLSession.shared.upload(for: request, from: data)
+        let (_, response) = try await FWBHTTP.session.upload(for: request, from: data)
         guard let http = response as? HTTPURLResponse, (200 ... 299).contains(http.statusCode) else {
             throw APIError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0, message: "Upload failed")
         }

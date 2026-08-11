@@ -245,7 +245,7 @@ final class AuthService {
         req.setValue(FWBConfig.appId, forHTTPHeaderField: "X-App-Id")
         if let token = api.accessToken { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         req.timeoutInterval = 30
-        let (bytes, response) = try await URLSession.shared.data(for: req)
+        let (bytes, response) = try await FWBHTTP.session.data(for: req)
         // 401 only — see the note in `APIClient.request`. A 403 from `/me`
         // would be a real authorization answer, not an expired session.
         if let http = response as? HTTPURLResponse, http.statusCode == 401 {
@@ -389,7 +389,7 @@ final class AuthService {
                 req.setValue(FWBConfig.appId, forHTTPHeaderField: "X-App-Id")
                 req.setValue("Bearer \(bearer)", forHTTPHeaderField: "Authorization")
                 req.timeoutInterval = 15
-                _ = try? await URLSession.shared.data(for: req)
+                _ = try? await FWBHTTP.session.data(for: req)
             }
         }
 

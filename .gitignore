@@ -15,3 +15,8 @@ FWBSocial.xcodeproj/
 # a stray "Info 2.plist" or "FWBSocial 2.xcodeproj" as if it were real.
 *\ 2.*
 *\ 2
+# iCloud numbers its later conflict copies too — " 3", " 4" and up. The
+# original pattern only caught the first one, and a run that regenerated the
+# project while iCloud was mid-sync committed two of them.
+*\ [0-9].*
+*\ [0-9]

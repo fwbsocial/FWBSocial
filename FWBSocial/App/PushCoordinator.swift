@@ -152,7 +152,7 @@ final class PushCoordinator {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try? FWBJSON.encoder.encode(Body(token: token))
             req.timeoutInterval = 15
-            _ = try? await URLSession.shared.data(for: req)
+            _ = try? await FWBHTTP.session.data(for: req)
         }
     }
 

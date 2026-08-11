@@ -32,6 +32,43 @@ enum APIError: LocalizedError {
     }
 }
 
+// MARK: - HTTP transport
+//
+// **Every `/api` call goes through a session with NO HTTP cache**, and that is a
+// correctness fix, not a tuning knob (bug 8CC9EC4F, and the Feed's
+// empty-until-you-bounce-the-tab report).
+//
+// `URLCache` keys entries on the URL and ignores `Authorization` entirely, while
+// fwb-server labels per-caller reads `Cache-Control: public, max-age=60` — the
+// channel list included, whose entire payload is *the caller's* resolved roles.
+// On one install those two facts mean one member is served another member's
+// answer for a minute after a sign-out and sign-in, and at launch they mean the
+// signed-out feed is replayed to a session that has since restored.
+//
+// The bandwidth argument for keeping it is thin: this client never sends
+// `If-None-Match` by hand, so the only ETag saving on offer was URLSession's own
+// automatic revalidation — which is the same machinery that produced the bug.
+// The server's 304 path is still there for anyone who asks conditionally.
+nonisolated enum FWBHTTP {
+    static let session: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
+    /// Drop anything the *shared* cache is still holding for the previous
+    /// account. Called on every auth transition.
+    ///
+    /// The session above means fwb's own routes never populate it, but this
+    /// process shares `URLCache.shared` with `AsyncImage` and every other
+    /// URL-loading client in the app, and the blast radius of 8CC9EC4F should
+    /// not depend on that audit having been exhaustive.
+    static func clearSharedCache() {
+        URLCache.shared.removeAllCachedResponses()
+    }
+}
+
 // MARK: - API Client
 //
 // Ported near-verbatim from Flux's `APIClient` (PLAN.md §5.2) — generic REST
@@ -136,7 +173,7 @@ final class APIClient {
     ) async throws -> T {
         let req = try buildRequest(method: method, path: path, body: body)
         do {
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await FWBHTTP.session.data(for: req)
             guard let http = response as? HTTPURLResponse else { throw APIError.httpError(0, message: nil) }
 
             // **401 only.** The ported source refreshed on 403 too, which is
@@ -305,7 +342,7 @@ final class APIClient {
             contentType: "multipart/form-data; boundary=\(boundary)")
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: req)
+            let (data, response) = try await FWBHTTP.session.data(for: req)
             guard let http = response as? HTTPURLResponse else { throw APIError.httpError(0, message: nil) }
             if http.statusCode == 401 {
                 if retryOnUnauth, await AuthService.shared.refresh() {
