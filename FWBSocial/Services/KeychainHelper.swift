@@ -19,14 +19,33 @@ enum KeychainHelper {
             return
         }
         delete(key: key, service: service)
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String:          kSecClassGenericPassword,
             kSecAttrService as String:    service,
             kSecAttrAccount as String:    key,
             kSecValueData as String:      data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+            // `ThisDeviceOnly` so the bearer token is excluded from iCloud Keychain,
+            // encrypted backups, and device-to-device migration. A restored phone
+            // must sign in; it must not inherit a live session.
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         ]
-        let status = SecItemAdd(query as CFDictionary, nil)
+        // The NSE reads this token to fetch a message's ciphertext for a decrypted
+        // preview (PLAN.md §4.3.5), and an extension has its OWN default access
+        // group. House gotcha `reference_commune_nse_keychain_no_migration`: items do
+        // not migrate into a shared group — they must be WRITTEN with it set.
+        if let accessGroup = ChatKeychain.accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+
+        var status = SecItemAdd(query as CFDictionary, nil)
+        if status == errSecMissingEntitlement, query[kSecAttrAccessGroup as String] != nil {
+            // Keychain Sharing is not on this build's profile. Keep the session
+            // working and log the real reason, rather than leaving a contentless
+            // notification banner as the only symptom.
+            logger.error("Keychain access group refused — storing token ungrouped. NSE previews will not work on this build.")
+            query.removeValue(forKey: kSecAttrAccessGroup as String)
+            status = SecItemAdd(query as CFDictionary, nil)
+        }
         if status != errSecSuccess {
             logger.error("Keychain save failed for key '\(key)': OSStatus \(status)")
         }

@@ -20,6 +20,7 @@ schemes:
     build:
       targets:
         FWBSocial: all
+        FWBSocialNotificationService: all
     test:
       targets:
         - FWBSocialTests
@@ -45,6 +46,11 @@ targets:
       - path: FWBSocial
         excludes:
           - "FWBSocial.entitlements"
+    dependencies:
+      # Embeds the NSE into the app bundle. Without this the extension builds
+      # but is never installed, and every chat push stays a contentless banner.
+      - target: FWBSocialNotificationService
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: events.fwb.social
@@ -81,6 +87,43 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
+
+  # Notification Service Extension (PLAN.md §4.3.5). The APNs payload carries
+  # METADATA ONLY — conversation id, message id, sender id — because the server
+  # holds ciphertext and cannot produce a preview. This extension fetches the
+  # ciphertext plus this device's wrapped key over REST, decrypts on-device, and
+  # rewrites the banner as a communication notification.
+  #
+  # Two files are compiled into BOTH targets rather than shared through a
+  # framework: an extension cannot import its host app, and a framework for
+  # ~300 lines is not worth the launch cost in a 24 MB budget.
+  FWBSocialNotificationService:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: FWBSocialNotificationService
+        excludes:
+          - "FWBSocialNotificationService.entitlements"
+      - path: FWBSocial/Services/Chat/ChatMessageDecryptor.swift
+      - path: FWBSocial/Services/Chat/AppGroupStore.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: events.fwb.social.NotificationService
+        PRODUCT_NAME: FWBSocialNotificationService
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_ENTITLEMENTS: FWBSocialNotificationService/FWBSocialNotificationService.entitlements
+        # `UNNotificationServiceExtension` overrides are nonisolated, and the
+        # whole decrypt path runs off the main actor on URLSession's queue.
+        SWIFT_DEFAULT_ACTOR_ISOLATION: nonisolated
+    info:
+      path: FWBSocialNotificationService/Info.plist
+      properties:
+        CFBundleDisplayName: FWB Social Notifications
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.usernotifications.service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
 
   FWBSocialTests:
     type: bundle.unit-test

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Must match the app's group exactly — this is how the extension reads the
+	     sender names, conversation titles, avatar JPEGs and the
+	     `hide_message_previews` flag that the app mirrors in. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.events.fwb.social</string>
+	</array>
+
+	<!-- The app's keychain group, not the extension's own. The NSE reads the
+	     bearer token and this device's X-Wing private key from items the APP
+	     wrote; without this entry those items are invisible here and every
+	     notification silently degrades to a contentless "New message" banner
+	     (PLAN.md R5). -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)events.fwb.social</string>
+	</array>
+</dict>
+</plist>

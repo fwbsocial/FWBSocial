@@ -26,5 +26,28 @@
 	     Requires the Push Notifications capability on the App ID. -->
 	<key>aps-environment</key>
 	<string>$(APS_ENVIRONMENT)</string>
+
+	<!-- App Group — shared with FWBSocialNotificationService (PLAN.md §4.3.5).
+	     The NSE resolves sender names, conversation titles, avatars and the
+	     `hide_message_previews` flag from here, ON DEVICE, because the APNs
+	     payload carries metadata only: the server cannot read the message and
+	     therefore cannot put a preview in the push.
+	     Portal capability: App Groups → group.events.fwb.social. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.events.fwb.social</string>
+	</array>
+
+	<!-- Keychain Sharing — the NSE's decrypt path reads this device's X-Wing
+	     private key and the bearer token out of the keychain, and an extension
+	     has its OWN default access group. House gotcha
+	     (`reference_commune_nse_keychain_no_migration`): items do NOT migrate
+	     into a shared group. They must be WRITTEN with this group set, which is
+	     what `ChatKeychain` and `KeychainHelper` do.
+	     Portal capability: Keychain Sharing → events.fwb.social. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)events.fwb.social</string>
+	</array>
 </dict>
 </plist>
