@@ -263,6 +263,109 @@ nonisolated struct MuteChannelRequest: Encodable, Sendable {
     let muted: Bool
 }
 
+/// `POST /api/admin/channels`. Mirrors the server's `CreateChannelRequest`.
+///
+/// **`slug` is required and immutable after creation** — `AdminChannelController`
+/// deliberately leaves it out of the update route — so it is derived from the name
+/// once, at creation, and never rewritten when the name changes later. Only `slug`
+/// and `name` are required; the rest carry the server's own defaults
+/// (`visibility: vetted`, `defaultRole: commenter`, `allowMedia: true`).
+///
+/// `defaultRole` accepts `commenter | poster` ONLY — the server refuses
+/// `moderator` here with a 400, because a channel whose default role is moderator
+/// would hand every vetted member the removal tools.
+nonisolated struct CreateChannelRequest: Encodable, Sendable {
+    let slug: String
+    let name: String
+    var description: String?
+    var visibility: String?
+    var defaultRole: String?
+}
+
+/// The two wire values the server's `ChannelVisibility` accepts. `public_read`
+/// was cut server-side (§2.3), so there is no third case to render.
+nonisolated enum ChannelVisibilityOption: String, CaseIterable, Identifiable, Sendable {
+    case vetted
+    case restricted = "private"   // `private` is a Swift keyword; the RAW value is the contract
+
+    nonisolated var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .vetted:     return "Every vetted member"
+        case .restricted: return "Invite only"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .vetted:
+            return "Anyone who's been vetted can read and take part."
+        case .restricted:
+            return "Only members you add can see it — it won't even appear in anyone else's list."
+        }
+    }
+}
+
+/// The role a member gets in a new channel unless an admin overrides it per person.
+nonisolated enum ChannelDefaultRoleOption: String, CaseIterable, Identifiable, Sendable {
+    case commenter
+    case poster
+
+    nonisolated var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .commenter: return "Comment only"
+        case .poster:    return "Post and comment"
+        }
+    }
+
+    var explanation: String {
+        switch self {
+        case .commenter:
+            return "Members can reply to threads. Only the people you promote can start one."
+        case .poster:
+            return "Members can start threads as well as reply."
+        }
+    }
+}
+
+// MARK: - Slugs
+
+nonisolated enum FWBSlug {
+    /// The server's rule, applied here so the admin sees the slug before they
+    /// commit to it: `^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$` — lowercase, 3–50
+    /// characters, hyphen-separated, never starting or ending with a hyphen.
+    ///
+    /// Derived rather than typed because the slug is permanent and typing one is
+    /// an invitation to typo something nobody can ever correct.
+    static func kebab(from raw: String) -> String {
+        var out = ""
+        var lastWasHyphen = true   // seeded true so a leading separator is dropped
+        for scalar in raw.lowercased().unicodeScalars {
+            let isSlugCharacter = (scalar.value >= 97 && scalar.value <= 122)   // a–z
+                || (scalar.value >= 48 && scalar.value <= 57)                   // 0–9
+            if isSlugCharacter {
+                out.unicodeScalars.append(scalar)
+                lastWasHyphen = false
+            } else if !lastWasHyphen {
+                out.append("-")
+                lastWasHyphen = true
+            }
+        }
+        // The prefix can re-introduce a trailing hyphen the loop had allowed, so
+        // the trim happens after the truncation, not before it.
+        var trimmed = String(out.prefix(50))
+        while trimmed.hasSuffix("-") { trimmed.removeLast() }
+        return trimmed
+    }
+
+    static func isValid(_ slug: String) -> Bool {
+        (3...50).contains(slug.count)
+    }
+}
+
 nonisolated struct ModerationActionRequest: Encodable, Sendable {
     var reason: String?
 }
