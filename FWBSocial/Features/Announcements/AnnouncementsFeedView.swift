@@ -22,6 +22,7 @@ struct AnnouncementsFeedView: View {
     @State private var editing: Announcement?
     @State private var pendingDelete: Announcement?
     @State private var showAuthSheet = false
+    @State private var showFriendCode = false
 
     /// Pinned announcements ride at the top. The server is expected to order
     /// this way too; doing it here as well means a paginated fetch can't shuffle
@@ -106,11 +107,22 @@ struct AnnouncementsFeedView: View {
         // The compose affordance moved to the floating action button (owner
         // navigation directive) — the trailing corner is the gear now.
         .rootSurfaceChrome()
+        // Owner directive 2026-08-11: the slot is never empty on a page a member
+        // can act on. Writing an announcement is an admin power, so a member's Feed
+        // carries the one thing every member can do from the screen they open most
+        // — hand out the code that is the only self-service way onto their friends
+        // list (commissioner decision 9 removes member search entirely).
+        //
+        // Signed OUT is the honest exception: there is no code to share and no
+        // account to share it from. The slot holds its space and draws nothing.
         .floatingAction(
-            isVisible: auth.isAdmin,
-            systemImage: "square.and.pencil",
-            label: "New announcement"
-        ) { showComposer = true }
+            isVisible: auth.isSignedIn,
+            systemImage: auth.isAdmin ? "square.and.pencil" : "qrcode",
+            label: auth.isAdmin ? "Announce" : "Share",
+            voiceOverLabel: auth.isAdmin ? "New announcement" : "Share your friend code"
+        ) {
+            if auth.isAdmin { showComposer = true } else { showFriendCode = true }
+        }
         .toolbar {
             if !auth.isSignedIn {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -125,6 +137,13 @@ struct AnnouncementsFeedView: View {
             AnnouncementComposerView(existing: announcement) { Task { await reload() } }
         }
         .sheet(isPresented: $showAuthSheet) { AuthFlowView() }
+        .sheet(isPresented: $showFriendCode) {
+            // Compact on purpose: it is a code, two buttons and a sentence, and a
+            // full-height sheet for that reads as a screen the member has to get
+            // back out of rather than as a card they hold up.
+            DismissableSheet { ShareFriendCodeSheet(code: auth.user?.friendCode) }
+                .presentationDetents([.medium, .large])
+        }
         .confirmationDialog(
             "Delete this announcement?",
             isPresented: .init(get: { pendingDelete != nil },
