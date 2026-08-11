@@ -21,10 +21,9 @@ nonisolated enum FWBEnvironment {
     var baseURL: String {
         switch self {
         case .development: return "http://localhost:8080"
-        // TODO: → "https://api.fwb.events" once Cloudflare DNS + the Fly cert
-        // are in place (PLAN.md §1.5 / Phase 0). Until then this is the live
-        // deployed server and it is what the app ships against.
-        case .production:  return "https://fwb-server.fly.dev"
+        // Custom domain live 2026-08-10: grey-cloud CNAME → fwb-server.fly.dev,
+        // Fly cert issued. The fly.dev hostname remains a valid fallback.
+        case .production:  return "https://api.fwb.events"
         }
     }
 }
@@ -61,9 +60,11 @@ nonisolated enum FWBConfig {
     // text changes materially — a row is a claim about a specific text, and a
     // boolean cannot answer "did they accept the version with the
     // zero-tolerance clause?".
-    static let termsURL = URL(string: "https://fwb.events/terms")!
-    static let privacyURL = URL(string: "https://fwb.events/privacy")!
-    static let guidelinesURL = URL(string: "https://fwb.events/guidelines")!
+    // Legal pages deploy to the legal.fwb.events subdomain (apex stays on the
+    // commissioner's Squarespace site — owner directive 2026-08-10).
+    static let termsURL = URL(string: "https://legal.fwb.events/terms")!
+    static let privacyURL = URL(string: "https://legal.fwb.events/privacy")!
+    static let guidelinesURL = URL(string: "https://legal.fwb.events/guidelines")!
     static let supportEmail = "hello@fwb.events"
     static let agreementsVersion = "2026-08-10"
 
