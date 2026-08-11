@@ -23,7 +23,9 @@ struct PostDetailView: View {
     @State private var post: ForumPost?
     @State private var comments: [ForumComment] = []
     @State private var isLoading = false
-    @State private var error: String?
+    // Unflattened: `ErrorStateView` needs the error itself to tell an offline
+    // device from a server refusal.
+    @State private var loadError: Error?
 
     @State private var draft = ""
     @State private var replyingTo: ForumComment?
@@ -66,8 +68,12 @@ struct PostDetailView: View {
                     commentsSection
                 } else if isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, 40)
-                } else if let error {
-                    FormErrorText(message: error).padding()
+                } else if let loadError {
+                    // A bare red line on an otherwise empty screen, with no way
+                    // back: the `.refreshable` this view carries needs content to
+                    // pull on, and there is none, so a failed thread was a dead end.
+                    ErrorStateView(error: loadError) { Task { await load() } }
+                        .padding(.top, Theme.Spacing.xxl)
                 }
             }
             .padding()
@@ -87,6 +93,7 @@ struct PostDetailView: View {
                         Image(systemName: "ellipsis.circle")
                     }
                     .accessibilityIdentifier("thread.menu")
+                    .accessibilityLabel("Thread actions")
                 }
             }
         }
@@ -404,6 +411,7 @@ struct PostDetailView: View {
                 Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Clear")
         }
     }
 
@@ -411,7 +419,7 @@ struct PostDetailView: View {
 
     private func load() async {
         isLoading = true
-        error = nil
+        loadError = nil
         do {
             async let postTask = APIClient.shared.post(id: postId)
             async let commentsTask = APIClient.shared.comments(postId: postId)
@@ -419,7 +427,7 @@ struct PostDetailView: View {
             comments = try await commentsTask.items
         } catch {
             guard !isCancellationError(error) else { isLoading = false; return }
-            self.error = error.localizedDescription
+            self.loadError = error
         }
         isLoading = false
     }
@@ -452,7 +460,7 @@ struct PostDetailView: View {
             } catch {
                 isSending = false
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -465,7 +473,7 @@ struct PostDetailView: View {
                 dismiss()
             } catch {
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -478,7 +486,7 @@ struct PostDetailView: View {
                 toasts.success("Comment deleted.")
             } catch {
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -490,7 +498,7 @@ struct PostDetailView: View {
                 toasts.success(pinned ? "Pinned." : "Unpinned.")
             } catch {
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -502,7 +510,7 @@ struct PostDetailView: View {
                 toasts.success(locked ? "Thread locked." : "Thread unlocked.")
             } catch {
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }

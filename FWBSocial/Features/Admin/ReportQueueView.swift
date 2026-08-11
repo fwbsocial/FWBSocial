@@ -22,7 +22,8 @@ struct ReportQueueView: View {
 
     @State private var queue: ReportQueueResponse?
     @State private var isLoading = false
-    @State private var error: String?
+    // Phase 8: kept as an `Error` so the offline branch is still answerable here.
+    @State private var loadError: Error?
     @State private var statusFilter: String?
     @State private var resolving: ReportResponse?
 
@@ -36,8 +37,8 @@ struct ReportQueueView: View {
                 }
             }
 
-            if let error {
-                Section { FormErrorText(message: error) }
+            if let loadError, !items.isEmpty {
+                Section { InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } } }
             }
 
             Section {
@@ -52,15 +53,25 @@ struct ReportQueueView: View {
                 }
             }
 
+            // **The most important `error == nil` in the app.** This is the
+            // Guideline 1.2 "act within 24 h" surface. Without the guard, a queue
+            // that 500'd told the on-call moderator "No open reports. That is the
+            // good outcome." — a false all-clear on the one screen where a false
+            // all-clear has a victim.
             if items.isEmpty && !isLoading {
                 Section {
-                    EmptyStateView(
-                        icon: "checkmark.shield",
-                        title: "Nothing waiting",
-                        message: statusFilter == nil
-                            ? "No open reports. That is the good outcome."
-                            : "No reports with that status.")
-                    .listRowBackground(Color.clear)
+                    if let loadError {
+                        ErrorStateView(error: loadError) { Task { await load() } }
+                            .listRowBackground(Color.clear)
+                    } else {
+                        EmptyStateView(
+                            icon: "checkmark.shield",
+                            title: "Nothing waiting",
+                            message: statusFilter == nil
+                                ? "No open reports. That is the good outcome."
+                                : "No reports with that status.")
+                        .listRowBackground(Color.clear)
+                    }
                 }
             }
 
@@ -117,12 +128,12 @@ struct ReportQueueView: View {
 
     private func load() async {
         isLoading = true
-        error = nil
+        loadError = nil
         do {
             queue = try await APIClient.shared.reportQueue(status: statusFilter)
         } catch {
             guard !isCancellationError(error) else { isLoading = false; return }
-            self.error = error.localizedDescription
+            self.loadError = error
         }
         isLoading = false
     }

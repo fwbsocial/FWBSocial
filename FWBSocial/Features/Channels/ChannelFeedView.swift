@@ -42,8 +42,10 @@ struct ChannelFeedView: View {
 
     var body: some View {
         List {
-            if let error = loader.error {
-                Section { FormErrorText(message: error) }
+            // Only over content. With an empty feed the failure takes the whole
+            // surface below, where it can carry a Try again.
+            if let error = loader.error, !visiblePosts.isEmpty {
+                Section { InlineErrorRow(message: error) { Task { await reload() } } }
             }
 
             if !pinned.isEmpty {
@@ -71,15 +73,23 @@ struct ChannelFeedView: View {
 
             if visiblePosts.isEmpty && !loader.isLoading && hasLoaded {
                 Section {
-                    EmptyStateView(
-                        icon: "text.bubble",
-                        title: current.mayPost ? "Start the first thread" : "Nothing here yet",
-                        message: current.mayPost
-                            ? "Be the first to post in \(current.displayName)."
-                            : "Posts in this channel will show up here.",
-                        actionTitle: current.mayPost ? "New post" : nil,
-                        action: current.mayPost ? { isComposing = true } : nil)
-                    .listRowBackground(Color.clear)
+                    if let failure = loader.failure {
+                        // "Start the first thread" over a failed fetch invites the
+                        // member to write a post into a channel the app cannot
+                        // currently read — and the composer would fail too.
+                        ErrorStateView(error: failure) { Task { await reload() } }
+                            .listRowBackground(Color.clear)
+                    } else {
+                        EmptyStateView(
+                            icon: "text.bubble",
+                            title: current.mayPost ? "Start the first thread" : "Nothing here yet",
+                            message: current.mayPost
+                                ? "Be the first to post in \(current.displayName)."
+                                : "Posts in this channel will show up here.",
+                            actionTitle: current.mayPost ? "New post" : nil,
+                            action: current.mayPost ? { isComposing = true } : nil)
+                        .listRowBackground(Color.clear)
+                    }
                 }
             }
         }
@@ -98,6 +108,7 @@ struct ChannelFeedView: View {
                 } label: {
                     Image(systemName: "ellipsis.circle")
                 }
+                .accessibilityLabel("Channel actions")
             }
 
         }
@@ -155,6 +166,13 @@ struct ChannelFeedView: View {
 
     // MARK: - Data
 
+    /// What both the error state's "Try again" and pull-to-refresh do.
+    private func reload() async {
+        await blocks.loadIfNeeded()
+        await loader.loadFirst(fetch)
+        hasLoaded = true
+    }
+
     private var fetch: PaginatedLoader<ForumPost>.PageFetcher {
         let slug = current.slug
         return { page, per in
@@ -185,6 +203,7 @@ struct PostRow: View {
     var onReport: () -> Void
 
     @State private var auth = AuthService.shared
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var isMine: Bool { post.author?.id == auth.user?.id }
 
@@ -197,20 +216,28 @@ struct PostRow: View {
                 onTap: onAuthorTap)
 
             HStack(spacing: 6) {
+                // Pinned and locked are states nothing else in the row states, so
+                // they are labelled rather than left as silent decoration.
                 if post.pinned {
                     Image(systemName: "pin.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(Theme.Colors.brand)
+                        .accessibilityLabel("Pinned")
                 }
                 if post.locked {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .accessibilityLabel("Locked")
                 }
                 Text(post.displayTitle)
                     .font(Theme.Typography.rowTitle)
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    // Two lines is enough for a feed title at default sizes and
+                    // clips a wrapped one at accessibility sizes, where a title is
+                    // routinely four or five. The feed can afford the height; a
+                    // member who cannot read the title cannot choose the thread.
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
             }
 
             if !post.displayBody.isEmpty {

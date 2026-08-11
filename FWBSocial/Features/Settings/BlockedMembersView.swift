@@ -22,16 +22,31 @@ struct BlockedMembersView: View {
 
     @State private var members: [BlockedUserResponse] = []
     @State private var isLoading = false
-    @State private var error: String?
+    // Phase 8: the failure is kept as an `Error`, not as a pre-flattened string,
+    // so the view can still ask whether it was the network (offline branch) after
+    // the fact. Flattening at the `catch` threw that away.
+    @State private var loadError: Error?
     @State private var pendingUnblock: BlockedUserResponse?
 
     var body: some View {
         List {
-            if let error {
-                Section { FormErrorText(message: error) }
+            if let loadError {
+                Section {
+                    // A failure with nothing on screen gets the whole surface; a
+                    // failure over a list that already loaded gets one line, because
+                    // replacing content the member can still read is a worse trade.
+                    if members.isEmpty {
+                        ErrorStateView(error: loadError) { Task { await load() } }
+                            .listRowBackground(Color.clear)
+                    } else {
+                        InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } }
+                    }
+                }
             }
 
-            if members.isEmpty && !isLoading {
+            // `loadError == nil` is the whole point: "Nobody blocked" is a claim
+            // about the server's answer, and a failed request is not an answer.
+            if members.isEmpty && !isLoading && loadError == nil {
                 Section {
                     EmptyStateView(
                         icon: "hand.raised",
@@ -43,20 +58,33 @@ struct BlockedMembersView: View {
 
             ForEach(members) { member in
                 HStack(spacing: Theme.Spacing.md) {
-                    AvatarView(name: member.name, url: nil, size: 36)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(member.name)
-                            .font(Theme.Typography.rowTitle)
-                        if let username = member.username {
-                            Text("@\(username)")
-                                .font(Theme.Typography.micro)
-                                .foregroundStyle(.secondary)
+                    HStack(spacing: Theme.Spacing.md) {
+                        AvatarView(name: member.name, url: nil, size: 36)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(member.name)
+                                .font(Theme.Typography.rowTitle)
+                            if let username = member.username {
+                                Text("@\(username)")
+                                    .font(Theme.Typography.micro)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
+                    // One element, and `.ignore` rather than `.combine` because the
+                    // avatar's initials are a `Text` too — combining would have
+                    // VoiceOver read "BN, Bea Nolan, @bea" for every row.
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(member.username.map { "\(member.name), @\($0)" } ?? member.name)
+
                     Spacer()
                     Button("Unblock") { pendingUnblock = member }
                         .font(Theme.Typography.caption)
                         .buttonStyle(.bordered)
+                        // Every row's button announced the bare word "Unblock", so a
+                        // list of blocked members offered a VoiceOver user several
+                        // identical controls and no way to tell whose block they were
+                        // about to lift.
+                        .accessibilityLabel("Unblock \(member.name)")
                 }
             }
 
@@ -89,13 +117,13 @@ struct BlockedMembersView: View {
 
     private func load() async {
         isLoading = true
-        error = nil
+        loadError = nil
         do {
             members = try await APIClient.shared.blockedUsers()
             await blocks.refresh()
         } catch {
             guard !isCancellationError(error) else { isLoading = false; return }
-            self.error = error.localizedDescription
+            self.loadError = error
         }
         isLoading = false
     }

@@ -28,7 +28,11 @@ struct FriendingWindowView: View {
     @State private var isClosed = false
     @State private var pending: Set<UUID> = []
     @State private var sent: Set<UUID> = []
-    @State private var errorMessage: String?
+    /// The roster failed to load. Distinct from `actionError` because one owns the
+    /// whole surface and the other is a line under it.
+    @State private var loadError: Error?
+    /// A single "add" failed; the roster itself is fine.
+    @State private var actionError: String?
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: Theme.Spacing.md)]
 
@@ -38,6 +42,12 @@ struct FriendingWindowView: View {
                 ProgressView().padding(.top, Theme.Spacing.xxl)
             } else if isClosed {
                 closedState
+            } else if let loadError {
+                // Ahead of the empty state on purpose. "Nobody else to show" over a
+                // failed fetch reads as "this event had no other attendees", which
+                // is a statement about other members that the app has not earned.
+                ErrorStateView(error: loadError) { Task { await load() } }
+                    .padding(.top, Theme.Spacing.xxl)
             } else if attendees.isEmpty {
                 EmptyStateView(
                     icon: "person.2.slash",
@@ -58,8 +68,8 @@ struct FriendingWindowView: View {
                 .padding()
             }
 
-            if let errorMessage {
-                FormErrorText(message: errorMessage).padding(.horizontal)
+            if let actionError {
+                FormErrorText(message: actionError).padding(.horizontal)
             }
         }
         .navigationTitle(eventName ?? "Who was there")
@@ -81,13 +91,16 @@ struct FriendingWindowView: View {
     }
 
     private func load() async {
+        isLoading = true
+        loadError = nil
         do {
             attendees = try await EventsAPI.attendees(lumaEventId: lumaEventId)
             isClosed = false
         } catch let APIError.httpError(code, _) where code == 404 {
             isClosed = true
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            guard !isCancellationError(error) else { isLoading = false; return }
+            loadError = error
         }
         isLoading = false
     }
@@ -102,7 +115,12 @@ struct FriendingWindowView: View {
             _ = try await FriendsAPI.sendRequest(to: attendee.userId, source: .event, eventId: lumaEventId)
             sent.insert(attendee.userId)
         } catch {
-            errorMessage = "Couldn't send that request. They may no longer be available."
+            guard !isCancellationError(error) else { return }
+            // The server tells these apart — already friends, request already
+            // pending, they've blocked you, the window just closed — and each one
+            // wants a different response from the member. One catch-all sentence
+            // made every case look like the same shrug.
+            actionError = error.fwbMessage
         }
     }
 }

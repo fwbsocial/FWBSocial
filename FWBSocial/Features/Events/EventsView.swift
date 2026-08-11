@@ -16,7 +16,9 @@ struct EventsView: View {
     @State private var windows: [FriendingWindowDTO] = []
     @State private var lumaStatus: LumaEmailStatusDTO?
     @State private var isLoading = true
-    @State private var loadError: String?
+    // Kept unflattened so the offline branch and the server's own refusal message
+    // both survive as far as the view. See `ErrorStateView`.
+    @State private var loadError: Error?
 
     var body: some View {
         @Bindable var appState = appState
@@ -39,13 +41,7 @@ struct EventsView: View {
                 if isLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, Theme.Spacing.xxl)
                 } else if let loadError {
-                    EmptyStateView(
-                        icon: "exclamationmark.triangle",
-                        title: "Couldn't load events",
-                        message: loadError,
-                        actionTitle: "Try again",
-                        action: { Task { await load() } }
-                    )
+                    ErrorStateView(error: loadError) { Task { await load() } }
                 } else if windows.isEmpty {
                     closedState
                 } else {
@@ -93,12 +89,25 @@ struct EventsView: View {
 
     private func load() async {
         loadError = nil
-        async let windowsTask = try? await EventsAPI.openWindows()
+
+        // The Luma status is genuinely optional — it only decides whether an
+        // explanatory card appears — so its failure stays swallowed. The windows
+        // are the screen, so theirs does not.
+        //
+        // It used to be `try?` on both, which destroyed the `APIError` before
+        // anything could read it: a 403 "you aren't vetted yet" and a DNS failure
+        // both came out as "We couldn't reach the server." The vetting refusal is
+        // the single most likely failure on this screen and the server writes a
+        // perfectly good sentence for it.
         async let statusTask = try? await EventsAPI.lumaEmailStatus()
-        let (loadedWindows, status) = await (windowsTask, statusTask)
-        windows = loadedWindows ?? []
-        lumaStatus = status
-        if loadedWindows == nil { loadError = "We couldn't reach the server." }
+        async let windowsTask = EventsAPI.openWindows()
+
+        lumaStatus = await statusTask
+        do {
+            windows = try await windowsTask
+        } catch {
+            if !isCancellationError(error) { loadError = error }
+        }
         isLoading = false
     }
 }

@@ -20,7 +20,9 @@ struct ChannelsView: View {
 
     @State private var channels: [Channel] = []
     @State private var isLoading = false
-    @State private var error: String?
+    // Kept unflattened so the view can distinguish an offline device from a
+    // server refusal, and so the server's own sentence survives to the screen.
+    @State private var loadError: Error?
     @State private var hasLoaded = false
     /// The server's own explanation for a 403, when it sent one.
     @State private var accessMessage: String?
@@ -29,7 +31,13 @@ struct ChannelsView: View {
         Group {
             if hasLoaded && channels.isEmpty && (accessMessage != nil || !auth.isVettedForForum) {
                 pendingState
-            } else if channels.isEmpty && hasLoaded && error == nil {
+            } else if channels.isEmpty, hasLoaded, let failure = loadError {
+                // Previously this case fell through to `list`, which drew an empty
+                // List with a thin error line in it — a blank screen with a
+                // footnote, and no way to retry short of a pull-to-refresh on
+                // nothing.
+                ErrorStateView(error: failure) { Task { await load() } }
+            } else if channels.isEmpty && hasLoaded && loadError == nil {
                 EmptyStateView(
                     icon: "bubble.left.and.bubble.right",
                     title: "No channels yet",
@@ -51,8 +59,10 @@ struct ChannelsView: View {
 
     private var list: some View {
         List {
-            if let error {
-                Section { FormErrorText(message: error) }
+            // Only over content — an empty list with an error takes the whole
+            // surface above, where the retry lives.
+            if let loadError {
+                Section { InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } } }
             }
 
             ForEach(channels) { channel in
@@ -103,7 +113,7 @@ struct ChannelsView: View {
     private func load() async {
         guard auth.isSignedIn else { return }
         isLoading = true
-        error = nil
+        loadError = nil
         do {
             channels = try await APIClient.shared.channels()
             hasLoaded = true
@@ -115,7 +125,7 @@ struct ChannelsView: View {
             hasLoaded = true
         } catch {
             guard !isCancellationError(error) else { isLoading = false; return }
-            self.error = error.localizedDescription
+            self.loadError = error
             hasLoaded = true
         }
         isLoading = false
@@ -144,15 +154,19 @@ private struct ChannelRow: View {
                         .font(Theme.Typography.rowTitle)
                         .foregroundStyle(.primary)
 
+                    // Both glyphs carry information no other part of the row
+                    // repeats, so they are labelled rather than hidden.
                     if channel.isPrivate {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+                            .accessibilityLabel("Private channel")
                     }
                     if channel.isMuted {
                         Image(systemName: "bell.slash.fill")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+                            .accessibilityLabel("Muted")
                     }
                 }
 
@@ -187,11 +201,39 @@ private struct ChannelRow: View {
         .padding(.vertical, 4)
     }
 
+    /// The channel's admin-chosen accent, made safe for whichever appearance is on.
+    ///
+    /// `accentHex` is a single value typed into an admin form, with no dark
+    /// variant and nothing checking it against a background. A deep colour picked
+    /// to look right in light mode is close to invisible on a dark background, and
+    /// a pale one washes out on a light one — the row's title glyph and its
+    /// coloured disc both go with it. Rather than reject the admin's colour, its
+    /// luminance is clamped into a band that stays legible on both, which keeps
+    /// the hue they chose and only moves how light it is.
     private var accent: Color {
         guard let hex = channel.accentHex else { return Theme.Colors.brand }
         let cleaned = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
-        guard let value = UInt32(cleaned, radix: 16) else { return Theme.Colors.brand }
-        return Color(hex: value)
+        guard cleaned.count == 6, let value = UInt32(cleaned, radix: 16) else {
+            return Theme.Colors.brand
+        }
+        return Color(uiColor: UIColor { traits in
+            let base = UIColor(
+                red: CGFloat((value >> 16) & 0xFF) / 255,
+                green: CGFloat((value >> 8) & 0xFF) / 255,
+                blue: CGFloat(value & 0xFF) / 255,
+                alpha: 1)
+            var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+            guard base.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+                return base
+            }
+            // On a dark background a colour needs to be light enough to read; on a
+            // light one, dark enough. The bands overlap, so a mid-tone accent is
+            // returned untouched in both.
+            let clamped = traits.userInterfaceStyle == .dark
+                ? max(brightness, 0.62)
+                : min(brightness, 0.72)
+            return UIColor(hue: hue, saturation: saturation, brightness: clamped, alpha: alpha)
+        })
     }
 }
 
