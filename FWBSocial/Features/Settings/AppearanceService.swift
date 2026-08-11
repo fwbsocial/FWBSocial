@@ -90,9 +90,15 @@ final class AppearanceService {
 
     private let themeKey = "FWBSocial.appearance.theme"
     private let iconKey  = "FWBSocial.appearance.iconPreference"
+    private let appThemeKey = "FWBSocial.appearance.appTheme"
 
     var theme: Theme {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: themeKey) }
+    }
+
+    /// What the app is painted on — Standard / Pine / Clubhouse. See AppTheme.swift.
+    var appTheme: AppTheme {
+        didSet { UserDefaults.standard.set(appTheme.rawValue, forKey: appThemeKey) }
     }
 
     private(set) var iconPreference: IconPreference
@@ -100,6 +106,7 @@ final class AppearanceService {
 
     private init() {
         theme = UserDefaults.standard.string(forKey: themeKey).flatMap(Theme.init(rawValue:)) ?? .system
+        appTheme = UserDefaults.standard.string(forKey: appThemeKey).flatMap(AppTheme.init(rawValue:)) ?? .standard
         iconPreference = UserDefaults.standard.string(forKey: iconKey).flatMap(IconPreference.init(rawValue:)) ?? .standard
     }
 
@@ -167,7 +174,10 @@ final class AppearanceService {
     /// does when the real setting flips; an instant swap of every colour on
     /// screen reads as a glitch.
     func applyToWindows(animated: Bool = false) {
-        let style = theme.uiStyle
+        // The app theme wins where it has an opinion: Pine is a dark palette, and
+        // rendering it under a light interface style would put near-black labels
+        // on a near-black green. See AppTheme.swift.
+        let style = appTheme.forcedInterfaceStyle ?? theme.uiStyle
         for scene in UIApplication.shared.connectedScenes {
             guard let windowScene = scene as? UIWindowScene else { continue }
             for window in windowScene.windows where window.overrideUserInterfaceStyle != style {
@@ -192,6 +202,11 @@ private struct AppearanceWindowOverride: ViewModifier {
         content
             .onAppear { appearance.applyToWindows() }
             .onChange(of: appearance.theme) { _, _ in
+                appearance.applyToWindows(animated: true)
+            }
+            // The app theme can force a style of its own (Pine is dark-only), so
+            // changing it has to re-resolve the window override too.
+            .onChange(of: appearance.appTheme) { _, _ in
                 appearance.applyToWindows(animated: true)
             }
             // Windows are created after this view appears, and go on being

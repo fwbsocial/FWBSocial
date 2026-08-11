@@ -24,7 +24,7 @@ struct RootTabView: View {
             Tab(FWBTab.home.title, systemImage: FWBTab.home.systemImage, value: FWBTab.home) {
                 // Path lives in AppState so an announcement push can navigate a
                 // tab the member hasn't opened yet.
-                NavigationStack(path: $appState.announcementPath) { HomeView() }
+                NavigationStack(path: $appState.announcementPath) { HomeView().fwbAppThemeSurface() }
             }
 
             // Gated on `FWBFeatures` — see AppState.swift. At Phase 3 these
@@ -32,7 +32,7 @@ struct RootTabView: View {
             // Profile (sign-out, account deletion) into the "More" overflow.
             if FWBTab.channels.isEnabled {
                 Tab(FWBTab.channels.title, systemImage: FWBTab.channels.systemImage, value: FWBTab.channels) {
-                    NavigationStack { memberOnly(ChannelsView(), tab: .channels) }
+                    NavigationStack { memberOnly(ChannelsView(), tab: .channels).fwbAppThemeSurface() }
                 }
             }
 
@@ -47,8 +47,10 @@ struct RootTabView: View {
                     // thread onto a tab that was never opened.
                     NavigationStack(path: $appState.chatPath) {
                         memberOnly(ChatListView(), tab: .chat)
+                            .fwbAppThemeSurface()
                             .navigationDestination(for: UUID.self) { conversationId in
                                 ChatThreadView(conversationId: conversationId)
+                                    .fwbAppThemeSurface()
                             }
                     }
                 }
@@ -61,6 +63,7 @@ struct RootTabView: View {
                     // roster on a tab that was never opened.
                     NavigationStack(path: $appState.eventPath) {
                         memberOnly(EventsView(), tab: .events)
+                            .fwbAppThemeSurface()
                     }
                 }
             }

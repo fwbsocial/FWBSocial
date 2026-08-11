@@ -159,6 +159,12 @@ struct DismissableSheet<Content: View>: View {
     var body: some View {
         NavigationStack {
             content
+                // A sheet is its own presentation, so the tab shell's backdrop
+                // does not reach it. Themed here rather than at each screen:
+                // this wrapper is what Profile and Settings are presented in.
+                // INSIDE the stack, because hiding a form's scroll background
+                // does not cross that boundary.
+                .fwbAppThemeSurface()
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Done") { dismiss() }

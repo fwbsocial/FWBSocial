@@ -70,23 +70,31 @@ enum Theme {
 
         // — Bubbles (chat, PLAN.md §4.3) —
         static let bubbleSent = Brand.base
-        static let bubbleReceived = Color(uiColor: UIColor { tc in
-            tc.userInterfaceStyle == .dark
-                ? UIColor(white: 0.23, alpha: 1)
-                : UIColor(white: 0.91, alpha: 1)
-        })
         static let bubbleSentText = onBrand
         static let bubbleReceivedText = Color.primary
 
-        // — Surfaces —
-        static let background = Color(uiColor: .systemBackground)
-        static let surface = Color(uiColor: .secondarySystemBackground)
-        static let field = Color(uiColor: UIColor { tc in
-            tc.userInterfaceStyle == .dark
-                ? UIColor(white: 0.17, alpha: 1.0)
-                : UIColor(white: 0.95, alpha: 1.0)
-        })
-        static let hairline = Color.primary.opacity(0.08)
+        // — Theme-dependent surfaces —
+        //
+        // These five resolve through the member's APP THEME (Standard / Pine /
+        // Clubhouse — see AppTheme.swift), which is why they are `var`s that read
+        // a palette rather than the `let` constants the rest of this enum is.
+        //
+        // `AppearanceService` is `@Observable`, so touching `appTheme` here
+        // registers a dependency on behalf of whatever view body is evaluating —
+        // switching the theme re-renders exactly the views that use a themed
+        // token, and nothing else. That is the whole mechanism; no screen reads
+        // the theme itself.
+        //
+        // `@MainActor` (against the enum's `nonisolated` default) because they now
+        // touch main-actor state. Every call site is a SwiftUI view body, which is
+        // already there.
+        @MainActor static var palette: AppTheme.Palette { AppearanceService.shared.appTheme.palette }
+
+        @MainActor static var background: Color { palette.background }
+        @MainActor static var surface: Color { palette.surface }
+        @MainActor static var field: Color { palette.field }
+        @MainActor static var hairline: Color { palette.hairline }
+        @MainActor static var bubbleReceived: Color { palette.bubbleReceived }
 
         // — Status —
         static let positive = Color.green

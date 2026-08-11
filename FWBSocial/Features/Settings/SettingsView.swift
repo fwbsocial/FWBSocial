@@ -21,18 +21,25 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            appearanceSection
-            if auth.isSignedIn {
-                privacySection
-                chatSection
-                notificationsSection
-                safetySection
+            Group {
+                appearanceSection
+                if auth.isSignedIn {
+                    privacySection
+                    chatSection
+                    notificationsSection
+                    safetySection
+                }
+                if auth.user?.isAdmin == true || auth.user?.isModerator == true {
+                    moderationSection
+                }
+                accountSection
+                aboutSection
             }
-            if auth.user?.isAdmin == true || auth.user?.isModerator == true {
-                moderationSection
-            }
-            accountSection
-            aboutSection
+            // A row's background is a per-row trait: set on the Form from
+            // OUTSIDE, it never reaches the rows, which is why the themed
+            // Settings sheet had system-grey rows floating on pine. Set on a
+            // Group INSIDE the form, every section inherits it.
+            .fwbThemedRows()
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -256,11 +263,28 @@ struct SettingsView: View {
     @ViewBuilder
     private var appearanceSection: some View {
         @Bindable var appearance = appearance
-        Section("Appearance") {
+        Section {
             Picker("Theme", selection: $appearance.theme) {
                 ForEach(AppearanceService.Theme.allCases) { Text($0.label).tag($0) }
             }
+            .accessibilityIdentifier("settings.appearanceTheme")
+        } header: {
+            Text("Appearance")
         }
+
+        Section {
+            Picker("App theme", selection: $appearance.appTheme) {
+                ForEach(AppTheme.allCases) { Text($0.label).tag($0) }
+            }
+            .accessibilityIdentifier("settings.appTheme")
+        } header: {
+            Text("App Theme")
+        } footer: {
+            // The selected theme's own sentence — which, for Pine, is where the
+            // member finds out the appearance picker above it does not apply.
+            Text(appearance.appTheme.blurb)
+        }
+
         Section("App Icon") {
             AppIconPicker()
         }

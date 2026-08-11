@@ -60,159 +60,165 @@ struct ProfileView: View {
     @ViewBuilder
     private func signedIn(_ user: AuthUser) -> some View {
         List {
-            Section {
-                HStack(spacing: Theme.Spacing.md) {
-                    AvatarView(name: user.displayName, url: user.avatarUrl, size: 60)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(user.displayName)
-                            .font(Theme.Typography.title)
-                        Text(user.email)
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(.secondary)
-                        if let username = user.username {
-                            Text("@\(username)")
+            Group {
+                Section {
+                    HStack(spacing: Theme.Spacing.md) {
+                        AvatarView(name: user.displayName, url: user.avatarUrl, size: 60)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(user.displayName)
+                                .font(Theme.Typography.title)
+                            Text(user.email)
                                 .font(Theme.Typography.caption)
                                 .foregroundStyle(.secondary)
+                            if let username = user.username {
+                                Text("@\(username)")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.vertical, Theme.Spacing.xs)
+
+                    Button("Edit profile") { showEditProfile = true }
+                }
+
+                Section("Membership") {
+                    LabeledContent("Status") {
+                        StatusBadge(user.vettingLabel,
+                                    color: user.isVetted ? Theme.Colors.positive : Theme.Colors.caution)
+                    }
+                    if !user.isVetted {
+                        Text("Access opens up once we've matched you to an event check-in.")
+                            .font(Theme.Typography.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    // The Luma-email link (§4.5.3). It lives in Membership rather than
+                    // in a settings list because it is the mechanism by which a pending
+                    // member becomes vetted — for a Sign in with Apple member using the
+                    // private relay, it is the ONLY one. Shown even once verified, so
+                    // there is somewhere to change it.
+                    NavigationLink {
+                        LumaEmailLinkView(status: lumaStatus) { await loadLumaStatus() }
+                    } label: {
+                        LabeledContent("Luma email") {
+                            if let lumaStatus, lumaStatus.verified, let address = lumaStatus.lumaEmail {
+                                // Middle truncation on one line keeps the domain
+                                // visible, which is the point — but at accessibility
+                                // sizes one line of a `LabeledContent` value column is
+                                // a couple of characters, so the address becomes
+                                // unreadable exactly when readability is the request.
+                                // Two lines at the largest sizes, one otherwise.
+                                Text(address)
+                                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                                    .truncationMode(.middle)
+                            } else if lumaStatus?.promptRequired == true {
+                                StatusBadge("Needed", color: Theme.Colors.caution)
+                            } else {
+                                Text("Not linked").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .accessibilityIdentifier("profile.lumaEmail")
+                    if user.isAdmin {
+                        LabeledContent("Role", value: "Admin")
+                    } else if user.isModerator {
+                        LabeledContent("Role", value: "Moderator")
+                    }
+                    if let code = user.friendCode {
+                        // Friend codes are the out-of-band invite path (member
+                        // search is deliberately absent — commissioner decision 9),
+                        // so copying/sharing must be one tap.
+                        HStack {
+                            LabeledContent("Friend code") {
+                                Text(code)
+                                    .font(.body.monospaced())
+                                    .textSelection(.enabled)
+                            }
+                            ShareLink(item: "Add me on fwb social — friend code: \(code)") {
+                                Image(systemName: "square.and.arrow.up")
+                            }
+                            .buttonStyle(.borderless)
+                            // Supplying a custom image-only label suppresses ShareLink's
+                            // own "Share" label, leaving VoiceOver with a bare button.
+                            .accessibilityLabel("Share your friend code")
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            UIPasteboard.general.string = code
+                            toasts.show("Friend code copied")
                         }
                     }
                 }
-                .padding(.vertical, Theme.Spacing.xs)
 
-                Button("Edit profile") { showEditProfile = true }
-            }
-
-            Section("Membership") {
-                LabeledContent("Status") {
-                    StatusBadge(user.vettingLabel,
-                                color: user.isVetted ? Theme.Colors.positive : Theme.Colors.caution)
-                }
-                if !user.isVetted {
-                    Text("Access opens up once we've matched you to an event check-in.")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                // The Luma-email link (§4.5.3). It lives in Membership rather than
-                // in a settings list because it is the mechanism by which a pending
-                // member becomes vetted — for a Sign in with Apple member using the
-                // private relay, it is the ONLY one. Shown even once verified, so
-                // there is somewhere to change it.
-                NavigationLink {
-                    LumaEmailLinkView(status: lumaStatus) { await loadLumaStatus() }
-                } label: {
-                    LabeledContent("Luma email") {
-                        if let lumaStatus, lumaStatus.verified, let address = lumaStatus.lumaEmail {
-                            // Middle truncation on one line keeps the domain
-                            // visible, which is the point — but at accessibility
-                            // sizes one line of a `LabeledContent` value column is
-                            // a couple of characters, so the address becomes
-                            // unreadable exactly when readability is the request.
-                            // Two lines at the largest sizes, one otherwise.
-                            Text(address)
-                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
-                                .truncationMode(.middle)
-                        } else if lumaStatus?.promptRequired == true {
-                            StatusBadge("Needed", color: Theme.Colors.caution)
-                        } else {
-                            Text("Not linked").foregroundStyle(.secondary)
-                        }
+                if !user.emailVerified {
+                    Section {
+                        // Email verification is dormant server-side for now, so this
+                        // is informational rather than a blocker — nothing in the app
+                        // is gated on it yet.
+                        Label("Email not verified", systemImage: "envelope.badge")
+                            .foregroundStyle(Theme.Colors.caution)
+                        Button("Resend verification email") { resendVerification() }
                     }
                 }
-                .accessibilityIdentifier("profile.lumaEmail")
-                if user.isAdmin {
-                    LabeledContent("Role", value: "Admin")
-                } else if user.isModerator {
-                    LabeledContent("Role", value: "Moderator")
-                }
-                if let code = user.friendCode {
-                    // Friend codes are the out-of-band invite path (member
-                    // search is deliberately absent — commissioner decision 9),
-                    // so copying/sharing must be one tap.
-                    HStack {
-                        LabeledContent("Friend code") {
-                            Text(code)
-                                .font(.body.monospaced())
-                                .textSelection(.enabled)
-                        }
-                        ShareLink(item: "Add me on fwb social — friend code: \(code)") {
-                            Image(systemName: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.borderless)
-                        // Supplying a custom image-only label suppresses ShareLink's
-                        // own "Share" label, leaving VoiceOver with a bare button.
-                        .accessibilityLabel("Share your friend code")
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        UIPasteboard.general.string = code
-                        toasts.show("Friend code copied")
-                    }
-                }
-            }
 
-            if !user.emailVerified {
+                NotificationPreferencesSection()
+
+                Section("Avatar") {
+                    // R2 is not provisioned yet (PLAN.md Phase 0), so the upload
+                    // endpoint has nowhere to put the bytes. The control is left out
+                    // rather than shipped broken.
+                    Label {
+                        Text("Photo uploads aren't switched on yet.")
+                    } icon: {
+                        Image(systemName: "photo.badge.plus")
+                    }
+                    .font(Theme.Typography.preview)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section("Support") {
+                    Link(destination: URL(string: "mailto:\(FWBConfig.supportEmail)")!) {
+                        LabeledContent("Contact us", value: FWBConfig.supportEmail)
+                    }
+                    Link("Community guidelines", destination: FWBConfig.guidelinesURL)
+                    Link("Terms of use", destination: FWBConfig.termsURL)
+                    Link("Privacy policy", destination: FWBConfig.privacyURL)
+                }
+
+                if let errorMessage {
+                    Section { Text(errorMessage).foregroundStyle(Theme.Colors.danger) }
+                }
+
                 Section {
-                    // Email verification is dormant server-side for now, so this
-                    // is informational rather than a blocker — nothing in the app
-                    // is gated on it yet.
-                    Label("Email not verified", systemImage: "envelope.badge")
-                        .foregroundStyle(Theme.Colors.caution)
-                    Button("Resend verification email") { resendVerification() }
+                    Button("Sign out") { showSignOutConfirm = true }
+                        .accessibilityIdentifier("profile.signOut")
                 }
-            }
 
-            NotificationPreferencesSection()
-
-            Section("Avatar") {
-                // R2 is not provisioned yet (PLAN.md Phase 0), so the upload
-                // endpoint has nowhere to put the bytes. The control is left out
-                // rather than shipped broken.
-                Label {
-                    Text("Photo uploads aren't switched on yet.")
-                } icon: {
-                    Image(systemName: "photo.badge.plus")
-                }
-                .font(Theme.Typography.preview)
-                .foregroundStyle(.secondary)
-            }
-
-            Section("Support") {
-                Link(destination: URL(string: "mailto:\(FWBConfig.supportEmail)")!) {
-                    LabeledContent("Contact us", value: FWBConfig.supportEmail)
-                }
-                Link("Community guidelines", destination: FWBConfig.guidelinesURL)
-                Link("Terms of use", destination: FWBConfig.termsURL)
-                Link("Privacy policy", destination: FWBConfig.privacyURL)
-            }
-
-            if let errorMessage {
-                Section { Text(errorMessage).foregroundStyle(Theme.Colors.danger) }
-            }
-
-            Section {
-                Button("Sign out") { showSignOutConfirm = true }
-                    .accessibilityIdentifier("profile.signOut")
-            }
-
-            Section {
-                Button(role: .destructive) {
-                    showDeleteConfirm = true
-                } label: {
-                    if isDeleting {
-                        HStack { ProgressView(); Text("Deleting…") }
-                    } else {
-                        Text("Delete account")
+                Section {
+                    Button(role: .destructive) {
+                        showDeleteConfirm = true
+                    } label: {
+                        if isDeleting {
+                            HStack { ProgressView(); Text("Deleting…") }
+                        } else {
+                            Text("Delete account")
+                        }
                     }
+                    .disabled(isDeleting)
+                    .accessibilityIdentifier("profile.deleteAccount")
+                } footer: {
+                    // Guideline 5.1.1(v). Say what actually happens — the server
+                    // scrambles the identifying columns, revokes the Apple grant and
+                    // drops every token; forum posts are tombstoned to "Deleted
+                    // member" rather than erased.
+                    Text("Deleting removes your account, revokes any Sign in with Apple grant and signs you out everywhere. Posts you've made stay, attributed to a deleted member. This can't be undone.")
                 }
-                .disabled(isDeleting)
-                .accessibilityIdentifier("profile.deleteAccount")
-            } footer: {
-                // Guideline 5.1.1(v). Say what actually happens — the server
-                // scrambles the identifying columns, revokes the Apple grant and
-                // drops every token; forum posts are tombstoned to "Deleted
-                // member" rather than erased.
-                Text("Deleting removes your account, revokes any Sign in with Apple grant and signs you out everywhere. Posts you've made stay, attributed to a deleted member. This can't be undone.")
             }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            // The Group is the one place inside the List that every section
+            // can inherit it from.
+            .fwbThemedRows()
         }
         .confirmationDialog("Sign out?", isPresented: $showSignOutConfirm, titleVisibility: .visible) {
             Button("Sign out", role: .destructive) { auth.signOut() }
