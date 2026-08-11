@@ -6,10 +6,17 @@ import SwiftUI
 // `AuthUser.isAdmin`; enforced by the server's `RequireAdmin` on
 // `/api/admin/announcements`.
 //
-// Publishing is a separate, explicit action rather than a side effect of saving:
-// publishing is what fans out the push to the membership, and the server guards
-// a double-push with `push_sent_at`. An admin should never discover they
-// notified everyone because they fixed a typo.
+// Publishing stays an EXPLICIT act, not a side effect of saving: it is what fans
+// out the push to the membership, and the server guards a double-push with
+// `push_sent_at`. An admin should never discover they notified everyone because
+// they fixed a typo.
+//
+// The "Publish now" toggle is that explicit act, defaulted OFF so the save button
+// still means "save a draft" exactly as it always did. On the wire it is still
+// create-then-publish against the two existing endpoints — the server's create
+// route only ever makes drafts, and publish is the one place the fan-out lives,
+// so routing through it is what keeps "pushes exactly once" a property of one
+// code path rather than two.
 
 struct AnnouncementComposerView: View {
     /// `nil` creates; otherwise edits in place.
@@ -23,6 +30,7 @@ struct AnnouncementComposerView: View {
     @State private var body_ = ""
     @State private var visibility = "public"
     @State private var isPinned = false
+    @State private var publishNow = false
     @State private var isWorking = false
     @State private var errorMessage: String?
     @State private var showPublishConfirm = false
@@ -32,6 +40,9 @@ struct AnnouncementComposerView: View {
     private var canSave: Bool {
         !title.trimmed.isEmpty && !body_.trimmed.isEmpty && !isWorking
     }
+
+    /// A new announcement, or an existing one still in draft.
+    private var canPublish: Bool { existing == nil || existing?.isDraft == true }
 
     var body: some View {
         NavigationStack {
@@ -62,12 +73,18 @@ struct AnnouncementComposerView: View {
                     }
                 }
 
-                if isEditing, existing?.isDraft == true {
+                // Offered while the announcement is still a draft — which is
+                // every new one, and an existing one that has not gone out yet.
+                // Once it is published there is nothing left for this to do.
+                if canPublish {
                     Section {
-                        Button("Publish now") { showPublishConfirm = true }
-                            .disabled(isWorking)
+                        Toggle("Publish now", isOn: $publishNow)
+                            .accessibilityIdentifier("composer.publishNow")
+                            .accessibilityHint("Publishes on save and notifies members who have announcement notifications on")
                     } footer: {
-                        Text("Publishing notifies members who have announcement notifications turned on. It only sends once — re-publishing later won't notify anyone twice.")
+                        Text(publishNow
+                             ? "Goes out as soon as you \(isEditing ? "save" : "create") it. Members with announcement notifications on will get a push — once, even if you edit and save again later."
+                             : "Off: saved as a draft. Only admins can see it, and nobody is notified until you publish.")
                     }
                 }
             }
@@ -78,8 +95,13 @@ struct AnnouncementComposerView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(isEditing ? "Save" : "Create") { save(publish: false) }
-                        .disabled(!canSave)
+                    Button(isEditing ? "Save" : "Create") {
+                        // The toggle is deliberate, but the confirmation stays:
+                        // this is the one button in the app that notifies the
+                        // entire membership, and it cannot be taken back.
+                        if publishNow { showPublishConfirm = true } else { save(publish: false) }
+                    }
+                    .disabled(!canSave)
                 }
             }
             .confirmationDialog("Publish this announcement?", isPresented: $showPublishConfirm, titleVisibility: .visible) {
