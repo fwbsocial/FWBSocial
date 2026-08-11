@@ -33,6 +33,7 @@ struct FriendingWindowView: View {
     @State private var loadError: Error?
     /// A single "add" failed; the roster itself is fine.
     @State private var actionError: String?
+    @State private var isAddingFriend = false
 
     private let columns = [GridItem(.adaptive(minimum: 150), spacing: Theme.Spacing.md)]
 
@@ -74,6 +75,22 @@ struct FriendingWindowView: View {
         }
         .navigationTitle(eventName ?? "Who was there")
         .navigationBarTitleDisplayMode(.inline)
+        // Owner directive 2026-08-11: every page registers. The roster's own cards
+        // cover everyone the SERVER is willing to list, which is deliberately not
+        // everyone who was there — `is_discoverable = false` members are absent by
+        // design. If you met one of them, they can still hand you their code, and
+        // this is where you would type it in.
+        .floatingAction(
+            isVisible: true,
+            systemImage: "person.badge.plus",
+            label: "Add",
+            voiceOverLabel: "Add friend by code"
+        ) { isAddingFriend = true }
+        .sheet(isPresented: $isAddingFriend) {
+            // The roster carries each person's request state, so a friendship made
+            // by code needs the cards refetched or one of them keeps saying "Add".
+            DismissableSheet { AddFriendSheet { Task { await load() } } }
+        }
         .task { await load() }
         .refreshable { await load() }
     }

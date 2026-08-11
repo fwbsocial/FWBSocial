@@ -17,6 +17,7 @@ import Foundation
 //   PATCH  /api/comments/:id                   edit (author only)
 //   DELETE /api/comments/:id                   remove (author or moderator)
 //   PUT|DELETE /api/{posts,comments}/:id/reactions
+//   POST   /api/admin/channels                create channel (RequireAdmin)
 //
 // Everything above sits behind `RequireVettedMember`, so a `pending` member gets
 // 403 on all of it. That is why `ChannelsView` renders a vetting-status screen
@@ -49,6 +50,21 @@ extension APIClient {
     @discardableResult
     func setChannelMuted(slug: String, muted: Bool) async throws -> Channel {
         try await put("/api/channels/\(slug)/mute", body: MuteChannelRequest(muted: muted))
+    }
+
+    /// Creates a channel. **Admin only** — `RequireAdmin` re-reads the row on every
+    /// request, so the client's `isAdmin` decides what to draw and nothing else.
+    ///
+    /// Note this route sits OUTSIDE `RequireVettedMember`, unlike every member
+    /// channel route above; an admin is not required to have been vetted through an
+    /// event check-in to curate the forum.
+    ///
+    /// The response is a `ChannelResponse` written from the admin's point of view —
+    /// `effective_role: moderator`, `muted: false` — so it is used to confirm the
+    /// write, not adopted into the member list. `ChannelsView` refetches instead.
+    @discardableResult
+    func createChannel(_ body: CreateChannelRequest) async throws -> Channel {
+        try await post("/api/admin/channels", body: body)
     }
 
     // MARK: - Posts

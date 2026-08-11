@@ -27,6 +27,30 @@ struct ChannelsView: View {
     /// The server's own explanation for a 403, when it sent one.
     @State private var accessMessage: String?
 
+    // The tab's contextual action (owner directive 2026-08-11). Two different
+    // actions behind one slot, because "what can you start from a list of
+    // channels" has two answers depending on who is asking.
+    @State private var isCreatingChannel = false
+    @State private var isPickingChannel = false
+    /// Chosen in the picker, presented after it closes. Two sheets cannot swap in
+    /// one runloop turn, so the composer waits for `onDismiss` rather than racing
+    /// the picker's dismissal and being swallowed.
+    @State private var pendingPostChannel: Channel?
+    @State private var postTarget: Channel?
+
+    /// Only where the SERVER's resolved role allows a thread to be started.
+    private var postableChannels: [Channel] {
+        channels.filter { $0.mayPost && !$0.archived }
+    }
+
+    /// An admin always has something to do here. A member has something to do here
+    /// once the forum is open to them at all — a `pending` member gets 403 on every
+    /// `/api/channels/*` route and is looking at the vetting screen, so the slot
+    /// stays empty rather than offering them a composer that cannot post.
+    private var hasContextualAction: Bool {
+        auth.isSignedIn && (auth.isAdmin || auth.isVettedForForum)
+    }
+
     var body: some View {
         Group {
             if hasLoaded && channels.isEmpty && (accessMessage != nil || !auth.isVettedForForum) {
@@ -48,6 +72,36 @@ struct ChannelsView: View {
         }
         .navigationTitle("Channels")
         .rootSurfaceChrome()
+        .floatingAction(
+            isVisible: hasContextualAction,
+            systemImage: auth.isAdmin ? "plus.rectangle.on.rectangle" : "plus.bubble",
+            label: auth.isAdmin ? "Add" : "New",
+            voiceOverLabel: auth.isAdmin ? "New channel" : "New post"
+        ) {
+            if auth.isAdmin { isCreatingChannel = true } else { isPickingChannel = true }
+        }
+        .sheet(isPresented: $isCreatingChannel) {
+            // The list is refetched rather than having the new channel appended:
+            // the admin route answers from the ADMIN's point of view
+            // (`effective_role: moderator`, `muted: false`), which is not what this
+            // list draws.
+            ChannelCreateView { _ in Task { await load() } }
+        }
+        .sheet(isPresented: $isPickingChannel, onDismiss: {
+            guard let chosen = pendingPostChannel else { return }
+            pendingPostChannel = nil
+            postTarget = chosen
+        }) {
+            DismissableSheet {
+                ChannelPickerSheet(channels: postableChannels) { channel in
+                    pendingPostChannel = channel
+                    isPickingChannel = false
+                }
+            }
+        }
+        .sheet(item: $postTarget) { channel in
+            PostComposerView(channel: channel) { _ in Task { await load() } }
+        }
         .task {
             await blocks.loadIfNeeded()
             await loadIfNeeded()

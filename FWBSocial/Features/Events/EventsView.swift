@@ -19,6 +19,7 @@ struct EventsView: View {
     // Kept unflattened so the offline branch and the server's own refusal message
     // both survive as far as the view. See `ErrorStateView`.
     @State private var loadError: Error?
+    @State private var isAddingFriend = false
 
     var body: some View {
         @Bindable var appState = appState
@@ -58,6 +59,20 @@ struct EventsView: View {
         }
         .navigationTitle("Events")
         .rootSurfaceChrome()
+        // Owner directive 2026-08-11: every page registers. Most of the time this
+        // tab is honestly empty — there is no event inside its 48 hours — and the
+        // screen's whole subject is adding the people you met. The friend code is
+        // the path that works when the roster has closed, or when the person you
+        // met is standing next to you now.
+        .floatingAction(
+            isVisible: true,
+            systemImage: "person.badge.plus",
+            label: "Add",
+            voiceOverLabel: "Add friend by code"
+        ) { isAddingFriend = true }
+        .sheet(isPresented: $isAddingFriend) {
+            DismissableSheet { AddFriendSheet() }
+        }
         .navigationDestination(for: String.self) { lumaEventId in
             FriendingWindowView(
                 lumaEventId: lumaEventId,

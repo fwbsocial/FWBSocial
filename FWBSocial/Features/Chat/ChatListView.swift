@@ -37,7 +37,8 @@ struct ChatListView: View {
         .floatingAction(
             isVisible: true,
             systemImage: "square.and.pencil",
-            label: "New conversation"
+            label: "New",
+            voiceOverLabel: "New message"
         ) { isPresentingNew = true }
         .sheet(isPresented: $isPresentingNew) {
             NavigationStack { NewConversationView() }

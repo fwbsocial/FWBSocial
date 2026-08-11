@@ -97,6 +97,20 @@ struct PostDetailView: View {
                 }
             }
         }
+        // Owner directive 2026-08-11: every page registers. A thread's action is
+        // the reply — the composer is already at the bottom of the screen, so this
+        // puts the caret in it rather than presenting a second one.
+        //
+        // Gated on `canComment`, which is the server's resolved channel role AND
+        // the post's own lock/removal state. A locked thread drops the whole
+        // composer, and an action that focuses a field nobody can see is a tap that
+        // does nothing.
+        .floatingAction(
+            isVisible: canComment,
+            systemImage: "text.bubble",
+            label: "Comment",
+            voiceOverLabel: "Add a comment"
+        ) { focusComposer() }
         .task {
             await blocks.loadIfNeeded()
             await load()
@@ -401,6 +415,16 @@ struct PostDetailView: View {
 
     private var canSend: Bool {
         !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+    }
+
+    /// Put the caret in the comment field.
+    ///
+    /// Off the current update deliberately: the tab slot's action fires during the
+    /// selection round-trip `RootTabView` performs to turn the trailing tab back
+    /// into a button, and a focus request made mid-restructure is granted against a
+    /// tree that is about to be replaced.
+    private func focusComposer() {
+        Task { @MainActor in isComposerFocused = true }
     }
 
     private func contextChip(text: String, clear: @escaping () -> Void) -> some View {

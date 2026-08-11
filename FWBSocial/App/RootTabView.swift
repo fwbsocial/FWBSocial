@@ -73,16 +73,32 @@ struct RootTabView: View {
             // present so the four main tabs keep identical spacing on every
             // page — when the surface has no action, the slot renders an empty
             // glyph and selecting it does nothing (see the intercept below).
+            //
             // `role: .search` gives it the system's separated trailing
             // treatment; it never presents content of its own.
+            //
+            // **Owner final decision 2026-08-11: separated wins.** The role was
+            // briefly dropped to get a word under the glyph the way the four real
+            // tabs have one — it works, and it costs the separation that tells a
+            // member at a glance that this slot is not a place, it is a verb. The
+            // separation was judged the more valuable of the two.
+            //
+            // The consequence to keep in mind when registering: **the label is not
+            // drawn.** A `.search`-role tab is icon-only by system design, so the
+            // glyph carries the whole meaning on screen and `voiceOverLabel` — the
+            // full phrase, not the condensed word — carries it for everyone else.
             Tab(value: FWBTab.compose, role: .search) {
                 Color.clear // never shown — selection is intercepted
             } label: {
                 if let contextual = appState.contextualAction {
                     Label(contextual.label, systemImage: contextual.systemImage)
+                        .accessibilityLabel(contextual.voiceOverLabel ?? contextual.label)
                 } else {
                     // An empty UIImage holds the slot without drawing a glyph.
+                    // Hidden from VoiceOver as well as from the eye: a nameless
+                    // slot that does nothing is not something to announce.
                     Label { Text("") } icon: { Image(uiImage: UIImage()) }
+                        .accessibilityHidden(true)
                 }
             }
 
