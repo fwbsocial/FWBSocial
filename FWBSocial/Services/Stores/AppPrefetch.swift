@@ -71,6 +71,7 @@ enum AppPrefetch {
     static func signedIn() {
         logger.notice("signed in — rewarming every tab")
         FWBHTTP.clearSharedCache()
+        AvatarImageCache.shared.clear()
         Task { await AnnouncementsStore.shared.refresh() }
         Task { await ChatService.shared.start() }
         Task { await ChannelsStore.shared.warm() }
@@ -135,6 +136,9 @@ enum AppPrefetch {
         // First, and before anything can refetch: a cached response keyed only by
         // URL would otherwise be handed to whoever signs in next (bug 8CC9EC4F).
         FWBHTTP.clearSharedCache()
+        // Decoded avatars are keyed on an R2 object path, which says nothing
+        // about who was entitled to see it. Same rule, same moment.
+        AvatarImageCache.shared.clear()
         ChatService.shared.handleSignOut()
         AnnouncementsStore.shared.handleSignOut()
         ChannelsStore.shared.handleSignOut()

@@ -127,21 +127,61 @@ struct EmptyStateView: View {
 
 // MARK: - Avatar
 
+/// Decoded avatars, keyed on the R2 **object path** rather than the whole URL.
+///
+/// That distinction is the entire point. Avatars are served as presigned R2 URLs
+/// with a one-hour expiry, and the server re-mints the signature on every `/me`,
+/// every feed page and every profile read — so the same photo arrives as a
+/// *different URL string* several times a minute. `AsyncImage` keys on the URL
+/// and `FWBHTTP` runs with no `URLCache` (deliberately — bug 8CC9EC4F), so each
+/// re-mint was a fresh download that dropped back to the initials placeholder
+/// while it ran. The member sees their own face blink into a grey monogram every
+/// time a screen refreshes.
+///
+/// Stripping the query leaves `…/avatars/<user>-<uuid>.jpg`, which is stable for
+/// as long as the object is. An upload writes a NEW key (the server deletes the
+/// old object), so a changed avatar misses this cache and loads immediately —
+/// which is why no cache-busting parameter is needed anywhere.
+@MainActor
+final class AvatarImageCache {
+    static let shared = AvatarImageCache()
+
+    private let cache = NSCache<NSString, UIImage>()
+
+    private init() {
+        cache.countLimit = 200
+    }
+
+    /// The cache key: everything before the query. Nil for a URL we can't parse,
+    /// which simply means "don't cache this one".
+    nonisolated static func key(for urlString: String) -> String? {
+        guard var components = URLComponents(string: urlString) else { return nil }
+        components.query = nil
+        components.fragment = nil
+        return components.string
+    }
+
+    func image(forKey key: String) -> UIImage? { cache.object(forKey: key as NSString) }
+
+    func store(_ image: UIImage, forKey key: String) { cache.setObject(image, forKey: key as NSString) }
+
+    /// Called on every auth transition, alongside `FWBHTTP.clearSharedCache()`.
+    /// One member's face must not survive into another member's session.
+    func clear() { cache.removeAllObjects() }
+}
+
 /// A circular avatar with initials fallback.
 struct AvatarView: View {
     let name: String
     var url: String?
     var size: CGFloat = 40
 
+    @State private var loaded: UIImage?
+
     var body: some View {
         Group {
-            if let url, let u = URL(string: url) {
-                AsyncImage(url: u) { phase in
-                    switch phase {
-                    case .success(let image): image.resizable().scaledToFill()
-                    default: initials
-                    }
-                }
+            if let loaded {
+                Image(uiImage: loaded).resizable().scaledToFill()
             } else {
                 initials
             }
@@ -149,6 +189,32 @@ struct AvatarView: View {
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay(Circle().strokeBorder(Theme.Colors.hairline, lineWidth: 1))
+        // `id:` on the URL, so a member who changes their photo — or a row that
+        // is recycled onto a different person — reloads instead of keeping the
+        // previous face.
+        .task(id: url) { await load() }
+    }
+
+    private func load() async {
+        guard let url, let parsed = URL(string: url) else {
+            loaded = nil
+            return
+        }
+        let key = AvatarImageCache.key(for: url)
+        if let key, let cached = AvatarImageCache.shared.image(forKey: key) {
+            loaded = cached
+            return
+        }
+        // Only blank the previous image when there is nothing cached to show —
+        // otherwise a re-mint of the same object would flash the monogram, which
+        // is the whole thing this cache exists to prevent.
+        loaded = nil
+        guard let (data, response) = try? await FWBHTTP.session.data(from: parsed),
+              let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+              let image = UIImage(data: data)
+        else { return }
+        if let key { AvatarImageCache.shared.store(image, forKey: key) }
+        loaded = image
     }
 
     private var initials: some View {
