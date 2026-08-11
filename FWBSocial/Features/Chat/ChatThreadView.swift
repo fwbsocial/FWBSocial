@@ -291,6 +291,11 @@ struct ChatThreadView: View {
             .padding(.vertical, Theme.Spacing.sm)
         }
         .background(.bar)
+        // The composer is one piece of furniture — a bar material, a field, a
+        // reply banner and two glyphs — and it flips as one. `.bar` is a system
+        // material that reads `\.colorScheme`, so leaving it on the canvas would
+        // put a dark bar under a light member's white field.
+        .fwbThemedContainer()
     }
 
     private var canSend: Bool {

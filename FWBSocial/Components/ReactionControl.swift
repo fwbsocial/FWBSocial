@@ -108,6 +108,7 @@ struct ReactionControl: View {
             .background(
                 current == nil ? Theme.Colors.field : Theme.Colors.brandSoft,
                 in: Capsule())
+            .fwbThemedContainer()
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("reaction.toggle")
@@ -173,6 +174,7 @@ struct ReactionControl: View {
         .padding(.vertical, 4)
         .background(Theme.Colors.surface, in: Capsule())
         .overlay(Capsule().strokeBorder(Theme.Colors.hairline, lineWidth: 1))
+        .fwbThemedContainer()
         .transition(.scale(scale: 0.85, anchor: .leading).combined(with: .opacity))
         // Tapping anywhere else closes the fan without committing.
         .onTapGesture { }

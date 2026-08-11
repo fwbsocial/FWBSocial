@@ -40,6 +40,12 @@ struct SectionHeader: View {
 // MARK: - Card container
 
 /// A rounded surface card with hairline border.
+///
+/// The app's canonical CONTAINER, and the reason `fwbThemedContainer()` is a
+/// modifier rather than something each screen remembers: every card in the app
+/// goes through here, so light Clubhouse's white-box-with-dark-text is one line
+/// in one file. Applied last, wrapping the fill and the contents together — see
+/// the modifier's own note on why it cannot go on `content` alone.
 struct FWBCard<Content: View>: View {
     var padding: CGFloat = Theme.Spacing.lg
     @ViewBuilder var content: Content
@@ -52,6 +58,7 @@ struct FWBCard<Content: View>: View {
             .overlay(
                 Theme.roundedRect(Theme.Radius.card)
                     .strokeBorder(Theme.Colors.hairline, lineWidth: 1))
+            .fwbThemedContainer()
     }
 }
 
@@ -246,6 +253,11 @@ struct FWBTextField: View {
         .overlay(
             Theme.roundedRect(Theme.Radius.control)
                 .strokeBorder(Theme.Colors.hairline, lineWidth: 1))
+        // A field is furniture. It also carries the keyboard's appearance and the
+        // placeholder's colour, both of which come off `\.colorScheme` — a field
+        // left on the canvas in light Clubhouse would be a white box with a white
+        // placeholder in it and a dark keyboard under it.
+        .fwbThemedContainer()
     }
 }
 
@@ -266,6 +278,12 @@ struct FWBPrimaryButtonStyle: ButtonStyle {
             .background(Theme.Colors.brand.opacity(isEnabled ? 1 : 0.4), in: Theme.roundedRect(Theme.Radius.control))
             .opacity(configuration.isPressed ? 0.8 : 1)
             .scaleEffect(configuration.isPressed ? 0.99 : 1)
+            // Both the accent and `onBrand` are adaptive, and they are a matched
+            // PAIR — the light accent is measured against white, the dark accent
+            // against near-black. Restoring the real appearance keeps them
+            // together; leaving the button on the canvas would take the dark half
+            // of one and, on an empty state's CTA, sit it next to light copy.
+            .fwbThemedContainer()
     }
 }
 
@@ -279,5 +297,8 @@ struct FWBSecondaryButtonStyle: ButtonStyle {
             .background(Theme.Colors.field, in: Theme.roundedRect(Theme.Radius.control))
             .overlay(Theme.roundedRect(Theme.Radius.control).strokeBorder(Theme.Colors.hairline, lineWidth: 1))
             .opacity(configuration.isPressed ? 0.8 : 1)
+            // `.primary` on `Theme.Colors.field` — the one combination that is
+            // white-on-white the moment the fill flips and the label does not.
+            .fwbThemedContainer()
     }
 }

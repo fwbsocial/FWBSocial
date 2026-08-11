@@ -182,6 +182,10 @@ struct MessageBubble: View {
             isFromMe: isMine
         ))
         .opacity(message.sendState == .pending ? 0.65 : 1)
+        // The bubble is a container; the sender name and the footer around it are
+        // NOT — they sit on the canvas and stay light in both appearances, which
+        // is why this is on `bubble` and not on `body`.
+        .fwbThemedContainer()
     }
 
     /// The decrypt seam Cove used, unchanged: the R2 object is ciphertext and the
@@ -231,6 +235,7 @@ struct MessageBubble: View {
                 .padding(.vertical, 2)
                 .background(Theme.Colors.surface, in: Capsule())
                 .overlay(Capsule().strokeBorder(Theme.Colors.hairline))
+                .fwbThemedContainer()
                 // A bare emoji plus a bare numeral read as two unrelated fragments,
                 // and the numeral is dropped entirely when only one person reacted —
                 // so the count was guesswork. Name the reaction and say how many.
@@ -348,6 +353,7 @@ struct TypingBubble: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(Theme.Colors.bubbleReceived, in: Capsule())
+        .fwbThemedContainer()
         .task {
             // No `autoreverses` — house preference
             // (`feedback_ambient_animation_no_autoreverse`): a reversing dot loop

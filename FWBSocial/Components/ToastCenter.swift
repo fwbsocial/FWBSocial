@@ -47,7 +47,17 @@ final class ToastCenter {
 struct ToastBanner: View {
     let message: ToastMessage
 
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorScheme) private var inheritedScheme
+    @Environment(\.fwbContainerScheme) private var containerScheme
+
+    /// The appearance this banner's own surface is drawn in.
+    ///
+    /// `@Environment` is read against the view's own environment, which is the
+    /// CANVAS's — the `fwbThemedContainer()` in `body` cannot reach back up and
+    /// change it. So the two places that branch on the appearance by hand (the
+    /// border and the shadow) have to resolve it the same way the modifier does,
+    /// or a white toast in light Clubhouse gets dark mode's white border.
+    private var colorScheme: ColorScheme { containerScheme ?? inheritedScheme }
 
     private var color: Color {
         switch message.kind {
@@ -88,6 +98,8 @@ struct ToastBanner: View {
             colorScheme == .dark ? Color.white.opacity(0.16) : Theme.Colors.hairline,
             lineWidth: 1))
         .shadow(color: .black.opacity(colorScheme == .dark ? 0.45 : 0.12), radius: 12, y: 4)
+        // A floating card over whatever is behind it — furniture, so it flips.
+        .fwbThemedContainer()
         .padding(.horizontal, 16)
         // One element, not two, and static text rather than an unlabelled group: the
         // banner is a statement, and nothing in it is interactive.

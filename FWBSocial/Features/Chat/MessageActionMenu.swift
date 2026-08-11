@@ -66,6 +66,14 @@ struct MessageActionMenu: View {
             .background(Theme.Colors.surface, in: Theme.roundedRect(Theme.Radius.card))
         }
         .padding(Theme.Spacing.lg)
+        // Deliberately NOT `.fwbThemedContainer()`, and the reason is worth
+        // keeping: a SwiftUI sheet inherits its presenter's environment, so
+        // `\.fwbContainerScheme` reaches in here from the thread behind it — but
+        // the sheet's own background is the SYSTEM's, which follows the window,
+        // and under Clubhouse the window is dark. Restoring the light appearance
+        // inside would paint dark text onto that dark sheet. A sheet that does not
+        // draw the canvas is left to the window, and its `Theme.Colors.surface`
+        // cards resolve dark to match.
         .presentationDragIndicator(.visible)
         .confirmationDialog(
             "Delete this message?",

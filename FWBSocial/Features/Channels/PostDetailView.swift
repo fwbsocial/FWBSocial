@@ -322,6 +322,7 @@ struct PostDetailView: View {
         }
         .padding(Theme.Spacing.md)
         .background(Theme.Colors.surface, in: Theme.roundedRect(Theme.Radius.chip))
+        .fwbThemedContainer()
         .contextMenu {
             if comment.mayEdit && !comment.isRemoved {
                 Button {
@@ -393,6 +394,9 @@ struct PostDetailView: View {
         .padding(.horizontal, Theme.Spacing.lg)
         .padding(.vertical, Theme.Spacing.md)
         .background(.bar)
+        // Same as the chat composer: a bar material plus a field, flipping as one
+        // piece of furniture rather than sitting on the canvas.
+        .fwbThemedContainer()
     }
 
     private var canSend: Bool {

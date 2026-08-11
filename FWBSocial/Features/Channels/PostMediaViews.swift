@@ -146,6 +146,9 @@ struct PostMediaThumbnail: View {
                 ProgressView()
             }
         }
+        // The placeholder stands in for a photo, so it is a filled box with a
+        // glyph on it — the glyph has to be dark once the box turns white.
+        .fwbThemedContainer()
     }
 }
 
