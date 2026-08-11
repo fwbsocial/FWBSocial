@@ -27,6 +27,8 @@ struct FriendsView: View {
     @State private var isWorking = false
     @State private var errorMessage: String?
     @State private var statusMessage: String?
+    /// The list failed to load, as opposed to an individual action failing.
+    @State private var loadError: Error?
 
     var body: some View {
         Form {
@@ -67,16 +69,25 @@ struct FriendsView: View {
             if !requests.isEmpty {
                 Section("Requests") {
                     ForEach(requests) { request in
-                        HStack(spacing: Theme.Spacing.md) {
-                            AvatarView(name: request.fromDisplayName ?? "Member", url: nil)
-                                .frame(width: 36, height: 36)
-                            Text(request.fromDisplayName ?? "Someone")
-                                .font(Theme.Typography.rowTitle)
-                            Spacer()
-                            Button("Accept") { Task { await respond(request, accept: true) } }
-                                .buttonStyle(FWBPrimaryButtonStyle())
-                            Button("Decline") { Task { await respond(request, accept: false) } }
-                                .buttonStyle(FWBSecondaryButtonStyle())
+                        // Both button styles apply `.frame(maxWidth: .infinity)`, so
+                        // two of them side by side already fill the row at default
+                        // sizes and overflow it outright at accessibility sizes.
+                        // `ViewThatFits` keeps the one-line arrangement while it
+                        // fits and stacks the pair underneath the name when it
+                        // cannot.
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: Theme.Spacing.md) {
+                                requestIdentity(request)
+                                Spacer()
+                                requestActions(request)
+                            }
+                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    requestIdentity(request)
+                                    Spacer()
+                                }
+                                requestActions(request)
+                            }
                         }
                         .disabled(isWorking)
                     }
@@ -86,6 +97,12 @@ struct FriendsView: View {
             Section {
                 if isLoading {
                     ProgressView()
+                } else if let loadError {
+                    // Ahead of the empty state: "No friends yet" is a claim about
+                    // this member's social graph, and a failed fetch does not
+                    // entitle the app to make it.
+                    ErrorStateView(error: loadError) { Task { await load() } }
+                        .listRowBackground(Color.clear)
                 } else if friends.isEmpty {
                     Text("No friends yet. Add someone with their code, or meet people through an event's friending window.")
                         .font(Theme.Typography.preview)
@@ -110,6 +127,10 @@ struct FriendsView: View {
                                 Image(systemName: "bubble.left.and.text.bubble.right")
                             }
                             .accessibilityIdentifier("friends.message.\(friend.userId.uuidString)")
+                            // The name has to be in the label: every row's button
+                            // is otherwise the same unlabelled glyph, so VoiceOver
+                            // gave no way to tell whom you were about to message.
+                            .accessibilityLabel("Message \(friend.displayName)")
                         }
                         .swipeActions {
                             Button("Remove", role: .destructive) { Task { await unfriend(friend) } }
@@ -132,12 +153,44 @@ struct FriendsView: View {
         .refreshable { await load() }
     }
 
+    // MARK: Request row pieces
+    //
+    // Split out so the one-line and stacked arrangements above are two layouts of
+    // the same content rather than two copies of it.
+
+    @ViewBuilder
+    private func requestIdentity(_ request: FriendRequestDTO) -> some View {
+        AvatarView(name: request.fromDisplayName ?? "Member", url: nil)
+            .frame(width: 36, height: 36)
+        Text(request.fromDisplayName ?? "Someone")
+            .font(Theme.Typography.rowTitle)
+    }
+
+    private func requestActions(_ request: FriendRequestDTO) -> some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            Button("Accept") { Task { await respond(request, accept: true) } }
+                .buttonStyle(FWBPrimaryButtonStyle())
+            Button("Decline") { Task { await respond(request, accept: false) } }
+                .buttonStyle(FWBSecondaryButtonStyle())
+        }
+    }
+
     // MARK: Actions
 
     private func load() async {
         defer { isLoading = false }
-        friends = (try? await FriendsAPI.friends()) ?? []
-        requests = (try? await FriendsAPI.incomingRequests()) ?? []
+        loadError = nil
+        do {
+            // Both `try?`s used to collapse into `?? []`, which made a total
+            // outage indistinguishable from genuinely having no friends — the
+            // screen said "No friends yet. Add someone with their code" to a
+            // member with a full friends list and no signal.
+            friends = try await FriendsAPI.friends()
+            requests = try await FriendsAPI.incomingRequests()
+        } catch {
+            guard !isCancellationError(error) else { return }
+            loadError = error
+        }
     }
 
     private func lookup() async {
@@ -171,22 +224,44 @@ struct FriendsView: View {
     private func respond(_ request: FriendRequestDTO, accept: Bool) async {
         isWorking = true
         defer { isWorking = false }
-        _ = accept
-            ? try? await FriendsAPI.accept(request.id)
-            : try? await FriendsAPI.decline(request.id)
+        errorMessage = nil
+        do {
+            // Previously two `try?`s: a request that failed to be accepted simply
+            // stayed in the list, which looks identical to a tap that missed.
+            if accept {
+                _ = try await FriendsAPI.accept(request.id)
+            } else {
+                _ = try await FriendsAPI.decline(request.id)
+            }
+        } catch {
+            guard !isCancellationError(error) else { return }
+            errorMessage = error.fwbMessage
+        }
         await load()
     }
 
     private func unfriend(_ friend: FriendDTO) async {
-        try? await FriendsAPI.unfriend(friend.userId)
+        errorMessage = nil
+        do {
+            try await FriendsAPI.unfriend(friend.userId)
+        } catch {
+            guard !isCancellationError(error) else { return }
+            errorMessage = error.fwbMessage
+        }
         await load()
     }
 
     private func message(_ friend: FriendDTO) async {
-        guard let conversation = try? await ChatService.shared.startDirectConversation(with: friend.userId) else {
-            errorMessage = "You can't start a conversation with them right now."
-            return
+        errorMessage = nil
+        do {
+            let conversation = try await ChatService.shared.startDirectConversation(with: friend.userId)
+            AppState.shared.openConversation(id: conversation.id)
+        } catch {
+            guard !isCancellationError(error) else { return }
+            // The server distinguishes "they've blocked you", "your device isn't
+            // enrolled yet" and "you aren't vetted" here, and each needs a
+            // different response from the member. One flat sentence hid all three.
+            errorMessage = error.fwbMessage
         }
-        AppState.shared.openConversation(id: conversation.id)
     }
 }

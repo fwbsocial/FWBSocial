@@ -53,6 +53,15 @@ final class OnboardingService {
     /// The last status the server gave us, for anything that wants the detail.
     private(set) var status: OnboardingStatus?
 
+    /// Why the last age-band report failed to reach the server, when it did.
+    ///
+    /// `report(_:)` returns a bare `Bool`, so the gate screen had nothing to show
+    /// but its own guess — "check your connection" — even when the server had
+    /// answered with a reason. Kept alongside the `Bool` rather than replacing it,
+    /// because "not recorded" and "not recorded *because*" are different questions
+    /// and only the caller knows which it needs.
+    private(set) var lastAgeReportError: Error?
+
     /// Nothing left to ask, and nothing blocking.
     var isComplete: Bool { !needsTermsAcceptance && !needsAgeGate && ageGateBlock == nil }
 
@@ -215,6 +224,7 @@ final class OnboardingService {
 
     /// Send the band. Returns whether the server accepted it.
     private func report(_ band: DeclaredAgeBand) async -> Bool {
+        lastAgeReportError = nil
         do {
             if let remote = try await api.declareAgeRange(band) {
                 status = remote
@@ -231,6 +241,7 @@ final class OnboardingService {
         } catch {
             onboardingLog.error("Age declaration not recorded: \(error.localizedDescription)")
             isRunningOnLocalRecordOnly = true
+            lastAgeReportError = error
             return false
         }
     }

@@ -13,6 +13,7 @@ import SwiftUI
 struct ProfileView: View {
     @Environment(ToastCenter.self) private var toasts
     @Environment(AppState.self) private var appState
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var auth = AuthService.shared
     @State private var showEditProfile = false
@@ -23,6 +24,12 @@ struct ProfileView: View {
 
     @State private var lumaStatus: LumaEmailStatusDTO?
 
+    /// Deliberately swallowed. This only decides whether the Luma row says
+    /// "Linked" or "Not linked", and the row is informational — an error banner on
+    /// the profile screen because a secondary status call timed out would be more
+    /// alarming than the thing it reports. The row reads "Not linked" either way,
+    /// which is the safe direction to be wrong in: it invites the member to link,
+    /// and linking is idempotent.
     private func loadLumaStatus() async {
         lumaStatus = try? await EventsAPI.lumaEmailStatus()
     }
@@ -95,7 +102,15 @@ struct ProfileView: View {
                 } label: {
                     LabeledContent("Luma email") {
                         if let lumaStatus, lumaStatus.verified, let address = lumaStatus.lumaEmail {
-                            Text(address).lineLimit(1).truncationMode(.middle)
+                            // Middle truncation on one line keeps the domain
+                            // visible, which is the point — but at accessibility
+                            // sizes one line of a `LabeledContent` value column is
+                            // a couple of characters, so the address becomes
+                            // unreadable exactly when readability is the request.
+                            // Two lines at the largest sizes, one otherwise.
+                            Text(address)
+                                .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                                .truncationMode(.middle)
                         } else if lumaStatus?.promptRequired == true {
                             StatusBadge("Needed", color: Theme.Colors.caution)
                         } else {
@@ -123,6 +138,9 @@ struct ProfileView: View {
                             Image(systemName: "square.and.arrow.up")
                         }
                         .buttonStyle(.borderless)
+                        // Supplying a custom image-only label suppresses ShareLink's
+                        // own "Share" label, leaving VoiceOver with a bare button.
+                        .accessibilityLabel("Share your friend code")
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -248,7 +266,9 @@ struct NotificationPreferencesSection: View {
 
     @State private var prefs: NotificationPreferences?
     @State private var isSaving = false
-    @State private var loadFailed = false
+    // A `Bool` here meant the caught error was discarded at the `catch`, so the
+    // server's explanation never reached the screen. Keep the error itself.
+    @State private var loadError: Error?
 
     var body: some View {
         Section {
@@ -265,9 +285,12 @@ struct NotificationPreferencesSection: View {
                 toggle("Channel posts", value: prefs.notifyChannelPosts) {
                     NotificationPreferencesUpdate(notifyChannelPosts: $0)
                 }
-            } else if loadFailed {
-                Text("Couldn't load your notification settings.")
-                    .foregroundStyle(.secondary)
+            } else if let loadError {
+                // Was a flat "Couldn't load your notification settings." with no
+                // retry, which left the member staring at a dead section: the
+                // toggles below are `.disabled(prefs == nil)`, so a failed load
+                // silently greys out the whole of notification control.
+                InlineErrorRow(message: loadError.fwbMessage) { Task { await load(force: true) } }
             } else {
                 ProgressView()
             }
@@ -277,7 +300,7 @@ struct NotificationPreferencesSection: View {
             Text("You'll only get notifications for features you have access to.")
         }
         .disabled(isSaving)
-        .task { await load() }
+        .task { await load(force: false) }
     }
 
     private func toggle(
@@ -292,13 +315,17 @@ struct NotificationPreferencesSection: View {
         .tint(Theme.Colors.brand)
     }
 
-    private func load() async {
+    private func load(force: Bool) async {
         guard prefs == nil else { return }
+        // Without `force`, a retry after a failure was a no-op: the `.task` guard
+        // only checks `prefs == nil`, which is still true, so nothing re-fetched.
+        if loadError != nil && !force { return }
+        loadError = nil
         do {
             prefs = try await APIClient.shared.notificationPreferences()
-            loadFailed = false
         } catch {
-            loadFailed = true
+            guard !isCancellationError(error) else { return }
+            loadError = error
         }
     }
 
@@ -310,8 +337,11 @@ struct NotificationPreferencesSection: View {
                 // on what actually landed rather than on what was asked for.
                 prefs = try await APIClient.shared.updateNotificationPreferences(update)
             } catch {
-                toasts.error(error.localizedDescription)
-                await load()
+                toasts.error(error.fwbMessage)
+                // Re-read the server's actual state so a failed write doesn't
+                // leave the toggle showing what was asked for.
+                prefs = nil
+                await load(force: true)
             }
             isSaving = false
         }

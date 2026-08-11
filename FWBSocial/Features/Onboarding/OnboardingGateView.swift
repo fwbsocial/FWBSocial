@@ -125,7 +125,7 @@ struct TermsAcceptanceView: View {
                 Button {
                     accept()
                 } label: {
-                    if isWorking { ProgressView().tint(.white) } else { Text("Continue") }
+                    if isWorking { ProgressView().tint(Theme.Colors.onBrand) } else { Text("Continue") }
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(!accepted || isWorking)
@@ -200,7 +200,7 @@ struct AgeGateView: View {
                 Button {
                     runGate()
                 } label: {
-                    if isWorking { ProgressView().tint(.white) } else { Text("Confirm my age") }
+                    if isWorking { ProgressView().tint(Theme.Colors.onBrand) } else { Text("Confirm my age") }
                 }
                 .buttonStyle(FWBPrimaryButtonStyle())
                 .disabled(isWorking)
@@ -235,7 +235,13 @@ struct AgeGateView: View {
             }
             let proceeded = await onboarding.applyAgeGate(outcome, for: user)
             if !proceeded, onboarding.ageGateBlock == nil {
-                errorMessage = "We couldn't record that — check your connection and try again."
+                // Prefer whatever the server said. "Check your connection" is only
+                // right for the offline case, and this gate is the very first
+                // screen a new member meets — sending them to look at their Wi-Fi
+                // when the server has actually explained itself wastes the one
+                // moment they are most likely to give up in.
+                errorMessage = onboarding.lastAgeReportError?.fwbMessage
+                    ?? "We couldn't record that — check your connection and try again."
             }
             isWorking = false
         }

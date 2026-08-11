@@ -112,8 +112,31 @@ struct ReactionControl: View {
         .buttonStyle(.plain)
         .accessibilityIdentifier("reaction.toggle")
         .disabled(!canReact)
-        .accessibilityLabel(current.map { "Reacted \($0.label). \(displayCount) reactions." }
-                            ?? "React. \(displayCount) reactions.")
+        .accessibilityLabel(current.map { "Reacted \($0.label)" } ?? "React")
+        // The count is a `value`, not part of the label: VoiceOver re-announces a
+        // changed value on its own, and the count moves optimistically on every
+        // tap. Folded into the label it forced a re-read of the whole sentence.
+        .accessibilityValue("\(displayCount) reactions")
+        .accessibilityAddTraits(current == nil ? [] : .isSelected)
+        // **The five reactions were unreachable without sight.** The fan opened
+        // only on a long press, and VoiceOver does not synthesise one — so a
+        // VoiceOver member could apply `like` and nothing else, ever. Custom
+        // actions put all five (plus the undo) on the rotor, which is the
+        // documented equivalent of a press-and-hold menu.
+        .accessibilityActions {
+            ForEach(FWBReaction.allCases) { reaction in
+                Button(reaction.label) {
+                    guard canReact else { return }
+                    commit(current == reaction ? nil : reaction)
+                }
+            }
+            if current != nil {
+                Button("Remove my reaction") {
+                    guard canReact else { return }
+                    commit(nil)
+                }
+            }
+        }
         .onLongPressGesture(minimumDuration: 0.28) {
             guard canReact else { return }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -140,6 +163,10 @@ struct ReactionControl: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(reaction.label)
+                // The chosen reaction is drawn with a brand-soft disc behind it and
+                // nothing else, so without this trait all five announced
+                // identically and there was no way to tell which one was yours.
+                .accessibilityAddTraits(current == reaction ? .isSelected : [])
             }
         }
         .padding(.horizontal, 8)
@@ -152,7 +179,12 @@ struct ReactionControl: View {
         .background(
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { isExpanded = false })
+                .onTapGesture { isExpanded = false }
+                // An invisible full-bleed tap target is a real accessibility
+                // element to VoiceOver — an unlabelled one sitting over the
+                // content. It exists for the mouse-analogue "tap outside to
+                // dismiss" only, so it is hidden from the tree entirely.
+                .accessibilityHidden(true))
     }
 
     // MARK: - Commit
@@ -180,7 +212,10 @@ struct ReactionControl: View {
                 guard !isCancellationError(error) else { return }
                 optimistic = previousOverride
                 optimisticDelta = previousDelta
-                toasts.error("Couldn't save that reaction.")
+                // The server's own sentence, not a generic one: a reaction on a
+                // locked thread and a reaction while signed out fail differently,
+                // and only the server knows which happened.
+                toasts.error(error.fwbMessage)
                 _ = previousToken
             }
         }

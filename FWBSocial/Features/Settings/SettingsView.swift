@@ -15,6 +15,9 @@ struct SettingsView: View {
 
     @State private var prefs: NotificationPreferences?
     @State private var isLoadingPrefs = false
+    /// Why the preference toggles are inert. Kept as an `Error` rather than a
+    /// flattened string so the offline branch of `fwbMessage` still applies.
+    @State private var prefsError: Error?
 
     var body: some View {
         Form {
@@ -117,24 +120,36 @@ struct SettingsView: View {
     @ViewBuilder
     private var notificationsSection: some View {
         Section {
-            Toggle("Announcements", isOn: Binding(
-                get: { prefs?.notifyAnnouncements ?? true },
-                set: { savePrefs { $0.notifyAnnouncements = $1 }($0) }))
-            Toggle("Messages", isOn: Binding(
-                get: { prefs?.notifyDm ?? true },
-                set: { savePrefs { $0.notifyDm = $1 }($0) }))
-            Toggle("Friend requests", isOn: Binding(
-                get: { prefs?.notifyFriendRequests ?? true },
-                set: { savePrefs { $0.notifyFriendRequests = $1 }($0) }))
-            Toggle("New posts in channels", isOn: Binding(
-                get: { prefs?.notifyChannelPosts ?? true },
-                set: { savePrefs { $0.notifyChannelPosts = $1 }($0) }))
+            // The load failing used to be invisible: every toggle below simply went
+            // dead, showing its default value, with nothing to say why and no way to
+            // ask again. Now the reason is the server's own sentence and the retry is
+            // one tap. The row sits OUTSIDE the disabled group deliberately — a
+            // "Try again" button inside it would be disabled by the very failure it
+            // exists to recover from.
+            if let prefsError {
+                InlineErrorRow(message: prefsError.fwbMessage) { Task { await loadPrefs() } }
+            }
+
+            Group {
+                Toggle("Announcements", isOn: Binding(
+                    get: { prefs?.notifyAnnouncements ?? true },
+                    set: { savePrefs { $0.notifyAnnouncements = $1 }($0) }))
+                Toggle("Messages", isOn: Binding(
+                    get: { prefs?.notifyDm ?? true },
+                    set: { savePrefs { $0.notifyDm = $1 }($0) }))
+                Toggle("Friend requests", isOn: Binding(
+                    get: { prefs?.notifyFriendRequests ?? true },
+                    set: { savePrefs { $0.notifyFriendRequests = $1 }($0) }))
+                Toggle("New posts in channels", isOn: Binding(
+                    get: { prefs?.notifyChannelPosts ?? true },
+                    set: { savePrefs { $0.notifyChannelPosts = $1 }($0) }))
+            }
+            .disabled(prefs == nil)
         } header: {
             Text("Notifications")
         } footer: {
             Text("Channel notifications are throttled and grouped, and you can mute any single channel or conversation from its own screen.")
         }
-        .disabled(prefs == nil)
     }
 
     // MARK: - Chat preference plumbing
@@ -143,7 +158,10 @@ struct SettingsView: View {
         do {
             try await auth.updateProfile(inboxPolicy: policy.rawValue)
         } catch {
-            toasts.error("Couldn't save that setting.")
+            // The server's own sentence, not ours. "Couldn't save that setting."
+            // replaced messages that actually distinguish a rejected value from a
+            // dropped connection, and left the member with nothing to act on.
+            toasts.error(error.fwbMessage)
         }
     }
 
@@ -155,7 +173,7 @@ struct SettingsView: View {
             try await auth.updateProfile(hideMessagePreviews: hide)
         } catch {
             AppGroupStore.hideMessagePreviews = !hide
-            toasts.error("Couldn't save that setting.")
+            toasts.error(error.fwbMessage)
         }
     }
 
@@ -192,7 +210,13 @@ struct SettingsView: View {
     private func loadPrefs() async {
         guard auth.isSignedIn, prefs == nil, !isLoadingPrefs else { return }
         isLoadingPrefs = true
-        prefs = try? await APIClient.shared.notificationPreferences()
+        prefsError = nil
+        do {
+            prefs = try await APIClient.shared.notificationPreferences()
+        } catch {
+            // Cancellation is the member leaving the tab, not a failure to explain.
+            if !isCancellationError(error) { prefsError = error }
+        }
         isLoadingPrefs = false
     }
 
@@ -221,7 +245,7 @@ struct SettingsView: View {
                 } catch {
                     guard !isCancellationError(error) else { return }
                     prefs = previous
-                    toasts.error("Couldn't save that setting.")
+                    toasts.error(error.fwbMessage)
                 }
             }
         }

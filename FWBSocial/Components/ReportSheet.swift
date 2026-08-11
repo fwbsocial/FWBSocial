@@ -47,15 +47,24 @@ struct ReportSheet: View {
                                 Image(systemName: option.systemImage)
                                     .frame(width: 24)
                                     .foregroundStyle(reason == option ? Theme.Colors.brand : .secondary)
+                                    .accessibilityHidden(true)
                                 Text(option.label)
                                     .foregroundStyle(.primary)
                                 Spacer()
                                 if reason == option {
                                     Image(systemName: "checkmark")
                                         .foregroundStyle(Theme.Colors.brand)
+                                        .accessibilityHidden(true)
                                 }
                             }
                         }
+                        // Selection was signalled by tint and a checkmark glyph and
+                        // nothing else, so VoiceOver read every reason identically and
+                        // a member using it could not tell which one they had picked —
+                        // on the screen where picking the right one is the whole point.
+                        // The glyphs above are hidden because the trait now carries
+                        // that meaning, and "checkmark" spoken after the label does not.
+                        .accessibilityAddTraits(reason == option ? [.isSelected] : [])
                     }
                 } header: {
                     Text("Why are you reporting this \(targetType.subjectNoun)?")
@@ -102,7 +111,12 @@ struct ReportSheet: View {
             }
             .overlay {
                 if isSubmitting {
-                    ProgressView().controlSize(.large)
+                    // Unlabelled, this spinner is an unannounced element: VoiceOver
+                    // said nothing at all between "Submit" and the sheet dismissing,
+                    // so the report appeared to do nothing for several seconds.
+                    ProgressView()
+                        .controlSize(.large)
+                        .accessibilityLabel("Sending your report")
                 }
             }
         }
@@ -122,13 +136,34 @@ struct ReportSheet: View {
                     reason: reason,
                     details: details)
 
+                // The block is reported separately from the report itself. It has
+                // already been accepted by the server at this point, so a failed
+                // block must not fail the sheet — but it must not be described as a
+                // success either.
+                var blockFailure: String?
                 if alsoBlock, let blockableUserId {
-                    try? await APIClient.shared.block(userId: blockableUserId)
-                    blocks.markBlocked(blockableUserId)
+                    do {
+                        try await APIClient.shared.block(userId: blockableUserId)
+                        // `markBlocked` only after the server agreed. It used to run
+                        // unconditionally behind a `try?`, so a refused or unreachable
+                        // block still flipped the local store and the app told the
+                        // member "you won't see their posts, and they can't reach
+                        // you" — a Guideline 1.2 safety mechanism claiming to be on
+                        // while the server had it off. Silence is the wrong failure
+                        // mode for the one control someone reaches for when they feel
+                        // unsafe.
+                        blocks.markBlocked(blockableUserId)
+                    } catch {
+                        blockFailure = isCancellationError(error) ? nil : error.fwbMessage
+                    }
                 }
 
                 isSubmitting = false
-                toasts.success("Thanks — a moderator will review this.")
+                if let blockFailure {
+                    toasts.error("Report sent, but we couldn't block them. \(blockFailure)")
+                } else {
+                    toasts.success("Thanks — a moderator will review this.")
+                }
                 dismiss()
             } catch {
                 isSubmitting = false

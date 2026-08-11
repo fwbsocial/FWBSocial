@@ -294,7 +294,7 @@ struct PostComposerView: View {
             videoPreview = UIImage(data: info.poster)
             error = nil
         } catch {
-            self.error = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            self.error = error.fwbMessage
             videoItem = nil
             videoPreview = nil
             videoDuration = nil
@@ -318,7 +318,11 @@ struct PostComposerView: View {
                     // rendered; the post is fine.
                     return message ?? "Photos aren't available yet."
                 } catch {
-                    return "One of the photos didn't upload."
+                    // The server's own sentence. A photo rejected for its
+                    // dimensions, one rejected because the member was just banned,
+                    // and a dropped connection are three different problems, and
+                    // "One of the photos didn't upload." answered none of them.
+                    return error.fwbMessage
                 }
             }
             return nil
@@ -367,7 +371,7 @@ struct PostComposerView: View {
         } catch let APIError.httpError(code, message) where code == 503 {
             return message ?? "Video isn't available yet."
         } catch {
-            return (error as? LocalizedError)?.errorDescription ?? "The video didn't upload."
+            return error.fwbMessage
         }
     }
 }
