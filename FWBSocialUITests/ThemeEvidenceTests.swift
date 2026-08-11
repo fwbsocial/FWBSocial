@@ -35,15 +35,12 @@ final class ThemeEvidenceTests: XCTestCase {
         XCTAssertTrue(app.buttons["chrome.settings"].waitForExistence(timeout: timeout),
                       "the gear should be on the Feed. Tree:\n\(app.debugDescription)")
 
-        // Standard and Clubhouse carry both appearances; Pine forces dark, so a
-        // "light" frame of it would be the same picture twice.
-        let plan: [(theme: String, appearances: [String])] = [
-            ("Standard",  ["Light", "Dark"]),
-            ("Pine",      ["Dark"]),
-            ("Clubhouse", ["Light", "Dark"])
-        ]
+        // All six. The theme and the appearance compose — no theme forces a
+        // style — so every combination is a real one somebody can be sitting in.
+        let themes = ["Standard", "Pine", "Clubhouse"]
+        let appearances = ["Light", "Dark"]
 
-        for (theme, appearances) in plan {
+        for theme in themes {
             for appearance in appearances {
                 openSettings()
                 // Order matters for what this proves: the appearance is set
@@ -59,6 +56,50 @@ final class ThemeEvidenceTests: XCTestCase {
                 settle(1.5)
                 shoot("feed-\(theme.lowercased())-\(appearance.lowercased())")
             }
+        }
+    }
+
+    /// Clubhouse is the default, and it is visible before sign-in.
+    ///
+    /// MUST run against a freshly installed app — the assertion is about what a
+    /// member with NO stored preference gets, and any earlier test in this file
+    /// writes one. The capture script uninstalls first and runs this on its own.
+    func testDefaultThemeOnFirstLaunch() throws {
+        app.launch()
+
+        openSettings()
+        XCTAssertTrue(app.buttons["settings.appTheme"].firstMatch.waitForExistence(timeout: timeout),
+                      "the App theme picker should be in Settings. Tree:\n\(app.debugDescription)")
+        // Asserted on the section's FOOTER rather than the picker's value: a
+        // Form menu picker exposes an empty accessibility value, and the footer
+        // is `AppTheme.blurb` for whichever theme is selected — one sentence per
+        // theme, so it identifies the selection unambiguously.
+        let footer = app.staticTexts.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "The clubhouse painting behind everything")).firstMatch
+        XCTAssertTrue(footer.waitForExistence(timeout: 10),
+                      "with nothing stored, the app theme should default to Clubhouse. Tree:\n\(app.debugDescription)")
+        dismissSheet()
+
+        // The welcome sheet: the first screen a new member sees, and a separate
+        // presentation from the tab shell, so it is the one that would silently
+        // come up unthemed.
+        for appearance in ["Light", "Dark"] {
+            openSettings()
+            choose(appearance, in: "settings.appearanceTheme")
+            dismissSheet()
+            settle(1)
+
+            let cta = app.buttons["home.signInCTA"]
+            XCTAssertTrue(cta.waitForExistence(timeout: timeout),
+                          "signed out, Home should offer the sign-in card")
+            cta.tap()
+            XCTAssertTrue(app.buttons["auth.continueWithEmail"].waitForExistence(timeout: timeout),
+                          "the welcome sheet should be up. Tree:\n\(app.debugDescription)")
+            settle(1.5)
+            shoot("welcome-clubhouse-\(appearance.lowercased())")
+
+            app.swipeDown(velocity: .fast)
+            settle(1.5)
         }
     }
 
@@ -128,9 +169,23 @@ final class ThemeEvidenceTests: XCTestCase {
                       "the Settings sheet should open. Tree:\n\(app.debugDescription)")
     }
 
+    /// Closes the Settings sheet if it is up.
+    ///
+    /// Deliberately tolerant. The window-level appearance change cross-dissolves
+    /// the whole window, and an element found a moment earlier can be gone by the
+    /// time the tap lands — which failed the run at the fourth of six
+    /// combinations. What matters here is only that the sheet ends up closed.
     private func dismissSheet() {
-        let done = app.buttons["sheet.done"]
-        if done.waitForExistence(timeout: 5) { done.tap() }
+        for _ in 0..<3 {
+            let done = app.buttons["sheet.done"].firstMatch
+            guard done.waitForExistence(timeout: 5) else { return }
+            if done.isHittable {
+                done.tap()
+                if !app.buttons["sheet.done"].firstMatch.waitForExistence(timeout: 2) { return }
+            }
+            settle(1)
+        }
+        XCTAssertFalse(app.buttons["sheet.done"].firstMatch.exists, "the Settings sheet should have closed")
     }
 
     /// Taps a `Picker` row and then its option. A Form picker renders as a menu

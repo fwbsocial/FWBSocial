@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import SwiftUI
+import UIKit
 
 // MARK: - Theme namespace
 
@@ -256,6 +257,19 @@ struct GroupedBubbleShape: Shape {
 }
 
 // MARK: - Color(hex:) initializer
+
+extension UIColor {
+    /// Build a UIColor from a 0xRRGGBB integer literal. The UIKit twin of
+    /// `Color(hex:)`, needed because a dynamic (per-appearance) colour can only
+    /// be built through `UIColor`'s trait-collection provider.
+    nonisolated convenience init(hex: UInt32, alpha: CGFloat = 1.0) {
+        self.init(
+            red: CGFloat((hex >> 16) & 0xFF) / 255.0,
+            green: CGFloat((hex >> 8) & 0xFF) / 255.0,
+            blue: CGFloat(hex & 0xFF) / 255.0,
+            alpha: alpha)
+    }
+}
 
 extension Color {
     /// Build a Color from a 0xRRGGBB integer literal.

@@ -50,6 +50,11 @@ struct OnboardingGateView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Theme.Colors.background)
+            // The gate is a full-screen cover — its own presentation, which the
+            // tab shell's backdrop does not reach. It is also one of the first
+            // things a new member ever sees, and Clubhouse is the default theme,
+            // so it has to be themed or the default is not felt until later.
+            .fwbAppThemeSurface()
         }
         .interactiveDismissDisabled()
     }

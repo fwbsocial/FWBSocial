@@ -24,15 +24,25 @@ struct AuthFlowView: View {
     var body: some View {
         NavigationStack(path: $path) {
             welcome
+                // The welcome screen is the app's first impression, and it is a
+                // sheet — its own presentation, which the tab shell's backdrop
+                // does not reach. Themed here so the default theme is felt
+                // before sign-in rather than after it. Applied to each
+                // destination too, since a pushed screen is laid out by this
+                // stack but does not inherit a background from its root.
+                .fwbAppThemeSurface()
                 .navigationDestination(for: Destination.self) { destination in
-                    switch destination {
-                    case .signIn:
-                        SignInView(onForgotPassword: { path.append(.forgotPassword) })
-                    case .register:
-                        RegisterView()
-                    case .forgotPassword:
-                        ForgotPasswordView()
+                    Group {
+                        switch destination {
+                        case .signIn:
+                            SignInView(onForgotPassword: { path.append(.forgotPassword) })
+                        case .register:
+                            RegisterView()
+                        case .forgotPassword:
+                            ForgotPasswordView()
+                        }
                     }
+                    .fwbAppThemeSurface()
                 }
         }
         .onChange(of: AuthService.shared.isSignedIn) { _, signedIn in

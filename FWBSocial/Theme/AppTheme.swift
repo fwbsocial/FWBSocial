@@ -7,9 +7,10 @@
 //
 // Owner exploration 2026-08-11. Three choices:
 //
-//   Standard   the system's own backgrounds — grouped grey, white cards. Default.
-//   Pine       the icon's deep pine green as the app's own surface.
 //   Clubhouse  the icon's painted clubhouse texture as a fixed full-bleed photo.
+//              THE DEFAULT — owner directive 2026-08-11. See `AppearanceService`.
+//   Pine       the icon's pine green as the app's own flat surface.
+//   Standard   the system's own backgrounds — grouped grey, white cards.
 //
 // # Why this is a token, not a set of screens
 //
@@ -19,27 +20,30 @@
 // screen knows a theme exists. The only two places that DO know are
 // `fwbAppThemeSurface()`, which paints the backdrop, and the picker in Settings.
 //
-// # Why Pine forces dark
+// # Theme and appearance compose — all six combinations are real
 //
-// Pine's palette is a dark palette — it is the icon's background, and the icon's
-// background is nearly black-green. Rendered under a LIGHT interface style,
-// `Color.primary` resolves to near-black and every label on the app goes
-// unreadable against it. Forcing the window to `.dark` is what makes "ensure
-// text/hairline/bubble tokens all read correctly" true for free: the semantic
-// colours the whole app already uses resolve to their dark values, which are the
-// correct ones over a dark surface. The alternative — a parallel light-pine
-// palette plus per-view foreground overrides — is the per-view hack this file
-// exists to avoid.
+// Owner directive: neither custom theme forces an interface style. The theme
+// picks the FAMILY of colour; light/dark picks where in that family it sits.
 //
-// Clubhouse does NOT force a style: its scrim is appearance-aware (a white wash
-// in light, a black one in dark), so the same photo carries both.
+//   Pine · dark    the icon's background — #162B25–#204038, surfaces lifted out of it
+//   Pine · light   the same hue at daylight — a pale sage/mist ramp, pine hairlines
+//   Clubhouse      one painting, two scrims: white-leaning in light, black in dark
+//
+// Every themed token is therefore built with a UIColor dynamic provider, which
+// re-resolves on the trait change the window override causes. That is what keeps
+// `Color.primary` correct without a single foreground override anywhere: in light
+// Pine the ground is pale and the system's near-black label is right; in dark Pine
+// the ground is near-black green and the system's near-white label is right.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import SwiftUI
 import UIKit
 
 enum AppTheme: String, CaseIterable, Identifiable {
-    case standard, pine, clubhouse
+    // Declaration order is picker order — the default first. The raw values are
+    // strings, so this ordering carries no persistence meaning and a stored
+    // choice survives it.
+    case clubhouse, pine, standard
 
     var id: String { rawValue }
 
@@ -51,22 +55,17 @@ enum AppTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    /// One line in the picker's footer. Says what the member gets, including the
-    /// part that surprises them — that Pine ignores the appearance setting above it.
+    /// One line in the picker's footer, saying what the member gets. Each one
+    /// names BOTH appearances, because the theme choice and the appearance
+    /// choice above it compose rather than override.
     var blurb: String {
         switch self {
-        case .standard:  return "The system's own light and dark backgrounds."
-        case .pine:      return "The icon's deep pine green, throughout. Pine is a dark theme, so it stays dark whatever the appearance above is set to."
-        case .clubhouse: return "The clubhouse painting behind everything, dimmed enough to read over in either appearance."
-        }
-    }
-
-    /// A style this theme insists on, overriding the member's light/dark choice.
-    /// Only Pine has one — see the file comment.
-    var forcedInterfaceStyle: UIUserInterfaceStyle? {
-        switch self {
-        case .pine: return .dark
-        case .standard, .clubhouse: return nil
+        case .standard:
+            return "The system's own light and dark backgrounds."
+        case .pine:
+            return "The icon's pine green throughout — deep and near-black in dark, a pale sage at daylight in light."
+        case .clubhouse:
+            return "The clubhouse painting behind everything, under a scrim that lightens or darkens to keep text readable in either appearance."
         }
     }
 
@@ -113,13 +112,19 @@ enum AppTheme: String, CaseIterable, Identifiable {
             // Opaque, and deliberately so. Pine is a surface, not a wash — a
             // translucent card over the pine ramp would pick up the ramp's own
             // gradient and stop reading as a card at the top of a long scroll.
+            //
+            // "Lifted" inverts with the appearance, because it means "a step
+            // towards the light source", not "lighter": in dark that is a paler
+            // green than the ground, in light a whiter one.
             return Palette(
                 background: Pine.base,
                 surface: Pine.lifted,
                 field: Pine.sunken,
-                // 0.08 white over pine is very nearly invisible; the separator
-                // has to survive a dark, low-contrast ground.
-                hairline: Color.white.opacity(0.13),
+                // A white hairline over dark pine at the system's 0.08 is very
+                // nearly invisible; in light the separator is the pine hue
+                // itself, which keeps the theme's colour in the fine detail
+                // rather than dropping to a neutral grey.
+                hairline: Pine.hairline,
                 bubbleReceived: Pine.bubble)
 
         case .clubhouse:
@@ -148,15 +153,42 @@ enum AppTheme: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Pine's ramp. Owner's values: a #1A332C–#204038 bracket, with surfaces
-    /// lifted off it rather than outlined.
+    /// Pine's two ramps — one hue, two times of day.
+    ///
+    /// Dark is the owner's #1A332C–#204038 bracket, straight off the icon's
+    /// background. Light is the same hue taken up to daylight: a pale sage/mist
+    /// that keeps enough saturation to read as green rather than as grey, and
+    /// stays bright enough for the system's near-black label to sit on it. Every
+    /// value is a dynamic pair, so a window-level appearance change re-resolves
+    /// them with no view doing anything.
     enum Pine {
-        static let dark   = Color(hex: 0x162B25)
-        static let base   = Color(hex: 0x1A332C)
-        static let raised = Color(hex: 0x204038)
-        static let lifted = Color(hex: 0x24463C)
-        static let sunken = Color(hex: 0x142822)
-        static let bubble = Color(hex: 0x2B5147)
+        /// Top of the ramp.
+        static let deep    = adaptive(light: 0xF2F7F4, dark: 0x162B25)
+        /// The flat background, and the middle of the ramp.
+        static let base    = adaptive(light: 0xE8F1EC, dark: 0x1A332C)
+        /// Bottom of the ramp.
+        static let raised  = adaptive(light: 0xD9E8E0, dark: 0x204038)
+        /// A card or row, lifted off the ground.
+        static let lifted  = adaptive(light: 0xFAFCFB, dark: 0x24463C)
+        /// A field, sunk into it.
+        static let sunken  = adaptive(light: 0xDDEAE4, dark: 0x142822)
+        /// An incoming bubble.
+        static let bubble  = adaptive(light: 0xDCEAE3, dark: 0x2B5147)
+        /// A separator: the pine hue in light, a plain white lift in dark.
+        static let hairline = Color(uiColor: UIColor { tc in
+            tc.userInterfaceStyle == .dark
+                ? UIColor(white: 1, alpha: 0.13)
+                : UIColor(red: 0.106, green: 0.345, blue: 0.290, alpha: 0.18)  // #1B584A
+        })
+    }
+
+    /// A light/dark pair of `0xRRGGBB` literals as one dynamic colour. Resolved
+    /// per trait collection, which is what makes a theme's tokens follow the
+    /// appearance without the theme knowing what the appearance is.
+    private static func adaptive(light: UInt32, dark: UInt32) -> Color {
+        Color(uiColor: UIColor { tc in
+            UIColor(hex: tc.userInterfaceStyle == .dark ? dark : light)
+        })
     }
 
     // MARK: - Backdrop
@@ -171,8 +203,10 @@ enum AppTheme: String, CaseIterable, Identifiable {
             Color(uiColor: .systemBackground)
 
         case .pine:
+            // The stops are dynamic colours, so this one gradient is both the
+            // near-black bracket in dark and the sage-to-mist wash in light.
             LinearGradient(
-                colors: [Pine.dark, Pine.base, Pine.raised],
+                colors: [Pine.deep, Pine.base, Pine.raised],
                 startPoint: .top,
                 endPoint: .bottom)
 
