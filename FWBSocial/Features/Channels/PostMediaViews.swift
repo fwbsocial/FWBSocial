@@ -94,7 +94,25 @@ struct PostMediaView: View {
 struct PostMediaThumbnail: View {
     let media: PostMediaDTO
 
+    // `scaledToFill` deliberately reports a size LARGER than the proposal, and
+    // `.clipped()` clips a view to its own reported size — so with nothing
+    // establishing a definite box between them, a fill-scaled image does not get
+    // clipped to its cell at all. It escapes, and in a `List` row it paints over
+    // whatever is beside and above it: a three-photo post in a channel feed drew
+    // its right-hand column across the post's own title. The detail screen was
+    // unaffected only because its cells happen to be handed definite sizes.
+    //
+    // `Color.clear` accepts exactly the size it is offered, so the overlay it
+    // carries has a real box, and the clip finally has bounds that mean something.
     var body: some View {
+        Color.clear
+            .overlay { content }
+            .clipped()
+            .fwbCorner(Theme.Radius.chip)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         Group {
             if let urlString = media.previewUrl, let url = URL(string: urlString) {
                 AsyncImage(url: url, transaction: Transaction(animation: .easeIn(duration: 0.18))) { phase in
@@ -114,8 +132,6 @@ struct PostMediaThumbnail: View {
                 placeholder(systemImage: "photo")
             }
         }
-        .clipped()
-        .fwbCorner(Theme.Radius.chip)
     }
 
     @ViewBuilder
