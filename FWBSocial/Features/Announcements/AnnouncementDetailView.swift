@@ -12,9 +12,16 @@ struct AnnouncementDetailView: View {
     let announcementId: String
     var preloaded: Announcement?
 
+    @Environment(ToastCenter.self) private var toasts
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var auth = AuthService.shared
     @State private var announcement: Announcement?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var editing: Announcement?
+    @State private var pendingDelete: Announcement?
+    @State private var schedulingUnpin: Announcement?
 
     var body: some View {
         ScrollView {
@@ -22,7 +29,11 @@ struct AnnouncementDetailView: View {
                 VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
                     VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
                         if announcement.pinned {
-                            Label("Pinned", systemImage: "pin.fill")
+                            // Admins see when it lapses; a member has no pin
+                            // control, so the date would be noise to them.
+                            Label(
+                                (auth.isAdmin ? announcement.pinScheduleLabel : nil) ?? "Pinned",
+                                systemImage: "pin.fill")
                                 .font(Theme.Typography.caption)
                                 .foregroundStyle(Theme.Colors.brand)
                         }
@@ -76,11 +87,51 @@ struct AnnouncementDetailView: View {
         .navigationTitle("Announcement")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if let announcement, !announcement.displayBody.isEmpty {
+            if let announcement {
                 ToolbarItem(placement: .topBarTrailing) {
-                    ShareLink(item: "\(announcement.displayTitle)\n\n\(announcement.displayBody)")
+                    if auth.isAdmin {
+                        // The kebab REPLACES the standalone share button for
+                        // admins — share is one item inside it now, so the
+                        // trailing corner holds one control rather than two.
+                        AnnouncementKebabMenu(
+                            announcement: announcement,
+                            handlers: handlers(for: announcement))
+                    } else {
+                        ShareLink(item: announcement.shareText)
+                    }
                 }
             }
+        }
+        .contextMenu {
+            if auth.isAdmin, let announcement {
+                AnnouncementMenuItems(announcement: announcement, handlers: handlers(for: announcement))
+            }
+        }
+        .sheet(item: $editing) { target in
+            AnnouncementComposerView(existing: target) { Task { await load() } }
+        }
+        .sheet(item: $schedulingUnpin) { target in
+            UnpinDateSheet(announcement: target) { date in
+                AnnouncementActions(toasts: toasts).setPin(
+                    target, pinned: true, until: date, clearSchedule: date == nil
+                ) { updated in if let updated { announcement = updated } }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .confirmationDialog(
+            "Delete this announcement?",
+            isPresented: .init(get: { pendingDelete != nil },
+                               set: { if !$0 { pendingDelete = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                guard let target = pendingDelete else { return }
+                pendingDelete = nil
+                // Pops the screen: staying on the detail view of something that
+                // no longer exists would 404 on the next refresh.
+                AnnouncementActions(toasts: toasts).delete(target) { dismiss() }
+            }
+            Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
         .task {
             announcement = preloaded
@@ -90,6 +141,28 @@ struct AnnouncementDetailView: View {
             // on the next refresh either way.
             await APIClient.shared.markAnnouncementRead(id: announcementId)
         }
+    }
+
+    /// Built from the SAME `AnnouncementMenuItems` the feed uses; only the "and
+    /// then" differs — this screen reloads the one row it is showing.
+    /// `target`, not `announcement`: the parameter would otherwise shadow the
+    /// @State of the same name that these closures write back into.
+    private func handlers(for target: Announcement) -> AnnouncementMenuHandlers {
+        let actions = AnnouncementActions(toasts: toasts)
+        // Take the row the write returned rather than refetching: the member
+        // detail route serves published announcements only, so a reload right
+        // after "move to draft" would 404 and leave a published-looking screen.
+        let apply: (Announcement?) -> Void = { updated in
+            if let updated { announcement = updated }
+        }
+        return AnnouncementMenuHandlers(
+            edit: { editing = target },
+            publish: { actions.publish(target, onDone: apply) },
+            unpublish: { actions.unpublish(target, onDone: apply) },
+            pin: { actions.setPin(target, pinned: true, onDone: apply) },
+            unpin: { actions.setPin(target, pinned: false, onDone: apply) },
+            scheduleUnpin: { schedulingUnpin = target },
+            confirmDelete: { pendingDelete = target })
     }
 
     private func markdown(_ source: String) -> AttributedString {
