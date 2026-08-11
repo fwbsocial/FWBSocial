@@ -58,12 +58,23 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
 // So each tab is gated on its feature actually existing. Flip a flag the day the
 // phase lands — that is the whole change, and `RootTabView` needs no edit.
 nonisolated enum FWBFeatures {
-    /// Phase 4 (PLAN.md §4.2).
-    static let channels = false
+    /// Phase 4 (PLAN.md §4.2). **Live** — channels, posts, comments, reactions,
+    /// report/block and the moderator queue all run against deployed routes.
+    static let channels = true
     /// Phase 2/7 — Luma events and post-event friending (§4.5, §7).
     static let events = false
     /// Phase 6 — E2EE chat (§4.3).
     static let chat = false
+
+    /// Phase 6/7 — the friend graph (commissioner decision 9's second discovery
+    /// path). **The UI ships inert on purpose**: `AuthorProfileSheet` already
+    /// draws the request button, and `POST /api/friends/requests` does not exist
+    /// yet. Building the surface now and flipping one constant later beats
+    /// writing it under time pressure alongside chat.
+    ///
+    /// Note this is only the *first* of two gates — the target's own
+    /// `allowsFriendRequests` decides per-person even once this is on.
+    static let friendRequests = false
 }
 
 extension FWBTab {
