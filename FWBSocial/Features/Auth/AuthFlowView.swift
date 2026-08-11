@@ -52,7 +52,7 @@ struct AuthFlowView: View {
                     .foregroundStyle(Theme.Colors.brandGradient)
 
                 Text("fwb social")
-                    .font(Theme.Typography.display)
+                    .font(Theme.Typography.Sue.hero)
 
                 Text("Announcements, channels, events and private chat for members.")
                     .font(Theme.Typography.preview)

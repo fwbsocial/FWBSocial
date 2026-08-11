@@ -20,12 +20,12 @@ struct SectionHeader: View {
         VStack(alignment: .leading, spacing: 4) {
             if let eyebrow {
                 Text(eyebrow.uppercased())
-                    .font(Theme.Typography.caption.weight(.medium))
+                    .font(Theme.Typography.Sue.eyebrow)
                     .tracking(1.2)
                     .foregroundStyle(.secondary)
             }
             Text(title)
-                .font(Theme.Typography.display)
+                .font(Theme.Typography.Sue.navTitle)
                 .foregroundStyle(.primary)
             if let subtitle {
                 Text(subtitle)
@@ -92,7 +92,7 @@ struct EmptyStateView: View {
                 .font(.system(size: 40, weight: .light))
                 .foregroundStyle(.secondary)
             Text(title)
-                .font(Theme.Typography.title)
+                .font(Theme.Typography.Sue.heading)
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
             if let message {

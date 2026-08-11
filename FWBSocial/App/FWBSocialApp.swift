@@ -18,6 +18,12 @@ struct FWBSocialApp: App {
         auth.isSignedIn && onboarding.didLoad && !onboarding.isComplete
     }
 
+    init() {
+        // The nav-bar appearance proxy is global state, so it is set once here
+        // rather than from whichever view happens to appear first.
+        NavigationAppearance.apply()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootTabView()

@@ -91,6 +91,48 @@ enum Theme {
         static let caption = Font.caption
         static let micro = Font.caption2
         static let badge = Font.system(.caption2, design: .rounded).weight(.bold)
+
+        // MARK: Sue Ellen Francisco — expressive display type
+        //
+        // Owner directive 2026-08-10. Mirrors the shape Cove uses for Quicksand: a
+        // nested enum of a few named roles, every one built with `relativeTo:` so it
+        // scales with Dynamic Type rather than freezing at one size.
+        //
+        // **STYLED ELEMENTS ONLY** — large navigation titles, the welcome wordmark,
+        // empty-state headlines, section eyebrows. Body and UI text stay system.
+        // This face is a display face: it runs tall and narrow, it has one weight,
+        // and it is not legible at caption sizes or in a paragraph.
+        //
+        // Sizes are ~35 % above the system role they replace, which is what makes
+        // the narrow face read at the same optical weight rather than looking
+        // shrunken next to system text:
+        //
+        //     largeTitle 34 → 46      title2 22 → 30
+        //     headline   17 → 23      caption 12 → 16
+        //
+        // The family name in the file is `Sue Ellen Francisco` **with a trailing
+        // space**; the PostScript name is `SueEllenFrancisco`. Always the latter —
+        // `Font.custom` with a name it cannot resolve falls back to the system face
+        // silently, so the trailing space would look like "the directive was
+        // ignored" rather than like a bug.
+        nonisolated enum Sue {
+            static let name = "SueEllenFrancisco"
+
+            private static func make(_ style: Font.TextStyle, size: CGFloat) -> Font {
+                Font.custom(name, size: size, relativeTo: style)
+            }
+
+            /// The welcome wordmark — sign-in and onboarding only.
+            static let hero = make(.largeTitle, size: 46)
+            /// A large navigation title.
+            static let navTitle = make(.largeTitle, size: 46)
+            /// An empty-state headline, or a screen's section heading.
+            static let heading = make(.title2, size: 30)
+            /// An inline title / small heading.
+            static let label = make(.headline, size: 23)
+            /// A section eyebrow — the tracked, uppercased kicker above a title.
+            static let eyebrow = make(.caption, size: 16)
+        }
     }
 
     // MARK: Spacing scale (4-pt base)
