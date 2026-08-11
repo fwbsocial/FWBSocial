@@ -37,7 +37,11 @@ struct RootTabView: View {
             }
 
             if FWBTab.chat.isEnabled {
-                Tab(FWBTab.chat.title, systemImage: FWBTab.chat.systemImage, value: FWBTab.chat) {
+                // message.fill ↔ message.badge.fill: the badged glyph itself
+                // signals unread (owner directive), alongside the count badge.
+                Tab(FWBTab.chat.title,
+                    systemImage: chat.unreadTotal > 0 ? "message.badge.fill" : FWBTab.chat.systemImage,
+                    value: FWBTab.chat) {
                     // The path lives in AppState so a chat push — or a thread
                     // started from inside the new-conversation sheet — can push a
                     // thread onto a tab that was never opened.

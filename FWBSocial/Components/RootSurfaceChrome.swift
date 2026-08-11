@@ -100,40 +100,17 @@ extension View {
     }
 }
 
-// MARK: - Floating action button
-
-/// The one contextual action for a surface, or nothing.
-///
-/// Visibility is the caller's decision because it is an authorisation question every
-/// time — admin-only on Home, `mayPost` on a channel feed — and a button that
-/// appears and then 403s is worse than no button.
-struct FloatingActionButton: View {
-    let systemImage: String
-    let label: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: 22, weight: .medium))
-                // `.primary`, not the brand tint — see the note above.
-                .foregroundStyle(.primary)
-                .frame(width: 30, height: 30)
-        }
-        .buttonStyle(.glass)
-        .controlSize(.extraLarge)
-        .accessibilityLabel(label)
-        .accessibilityIdentifier("fab")
-        .padding(.trailing, Theme.Spacing.lg)
-        .padding(.bottom, Theme.Spacing.lg)
-    }
-}
+// MARK: - Contextual compose action (navigation bar)
 
 extension View {
-    /// Overlays the surface's single contextual action, bottom-trailing above the
-    /// tab bar. `isVisible: false` renders nothing at all rather than a disabled
-    /// button — a greyed-out action still advertises a capability the member does
-    /// not have.
+    /// The surface's single contextual action, as a navigation-bar trailing item —
+    /// owner directive 2026-08-11 (moved up from a floating bottom-right button so
+    /// it shares the chrome row instead of costing its own corner).
+    ///
+    /// `isVisible: false` renders nothing at all rather than a disabled button —
+    /// a greyed-out action still advertises a capability the member does not have,
+    /// and visibility is an authorisation question every time (admin-only on Feed,
+    /// `mayPost` on a channel).
     @ViewBuilder
     func floatingAction(
         isVisible: Bool,
@@ -142,14 +119,15 @@ extension View {
         action: @escaping () -> Void
     ) -> some View {
         if isVisible {
-            // `.frame(maxHeight: .infinity)` before the overlay is load-bearing: the
-            // overlay anchors to THIS view's bounds, and an empty state is only as
-            // tall as its content — which put the button mid-screen, on top of the
-            // very CTA it duplicates.
-            frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(alignment: .bottomTrailing) {
-                    FloatingActionButton(systemImage: systemImage, label: label, action: action)
+            toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(action: action) {
+                        Image(systemName: systemImage)
+                    }
+                    .accessibilityLabel(label)
+                    .accessibilityIdentifier("fab")
                 }
+            }
         } else {
             self
         }

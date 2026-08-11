@@ -23,19 +23,21 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .home:     return "Home"
+        case .home:     return "Feed"
         case .channels: return "Channels"
         case .events:   return "Events"
         case .chat:     return "Chat"
         }
     }
 
+    // Owner directive 2026-08-11: Feed = leaf.fill; Chat = message.fill so the
+    // `.badge` variant can signal unread (see RootTabView's conditional).
     var systemImage: String {
         switch self {
-        case .home:     return "house"
+        case .home:     return "leaf.fill"
         case .channels: return "bubble.left.and.bubble.right"
         case .events:   return "calendar"
-        case .chat:     return "lock.shield"
+        case .chat:     return "message.fill"
         }
     }
 }
