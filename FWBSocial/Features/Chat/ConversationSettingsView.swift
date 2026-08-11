@@ -153,7 +153,7 @@ struct ConversationSettingsView: View {
                         try await chat.leave(conversationId)
                         dismiss()
                     } catch {
-                        errorMessage = error.localizedDescription
+                        errorMessage = error.fwbMessage
                     }
                 }
             }

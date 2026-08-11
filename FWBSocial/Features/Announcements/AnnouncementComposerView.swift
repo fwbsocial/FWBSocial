@@ -147,7 +147,7 @@ struct AnnouncementComposerView: View {
                 onSaved()
                 dismiss()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isWorking = false
         }

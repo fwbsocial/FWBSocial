@@ -189,7 +189,7 @@ struct ChannelFeedView: View {
                 toasts.success(target ? "Muted \(current.displayName)." : "Unmuted \(current.displayName).")
             } catch {
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }

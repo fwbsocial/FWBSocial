@@ -232,7 +232,7 @@ struct ProfileView: View {
                 try await auth.resendVerification()
                 toasts.success("Verification email sent")
             } catch {
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -245,7 +245,7 @@ struct ProfileView: View {
                 try await auth.deleteAccount()
                 toasts.success("Account deleted")
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isDeleting = false
         }
@@ -407,7 +407,7 @@ struct EditProfileView: View {
                 toasts.success("Profile updated")
                 dismiss()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isSaving = false
         }

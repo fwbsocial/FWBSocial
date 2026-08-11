@@ -136,6 +136,7 @@ struct ChatListView: View {
 // MARK: - Row
 
 private struct ConversationRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let conversation: ChatConversation
     @State private var chat = ChatService.shared
 
@@ -148,7 +149,11 @@ private struct ConversationRow: View {
                 HStack(spacing: Theme.Spacing.xs) {
                     Text(chat.title(for: conversation))
                         .font(Theme.Typography.rowTitle)
-                        .lineLimit(1)
+                        // The busiest row in the app — avatar, title, mute glyph,
+                        // date and unread badge on one line. The title is the part
+                        // that identifies the conversation, so it is the part that
+                        // gets to grow when everything else cannot.
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     if conversation.muted {
                         Image(systemName: "bell.slash.fill")
                             .font(Theme.Typography.micro)

@@ -311,7 +311,7 @@ struct ChatThreadView: View {
             }
         } catch {
             draft = text
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = error.fwbMessage
         }
     }
 
@@ -331,7 +331,7 @@ struct ChatThreadView: View {
         } catch {
             // R2 is not provisioned yet, and the server says so with a 503 and a
             // renderable sentence rather than a 500. Surface it verbatim.
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = error.fwbMessage
         }
     }
 

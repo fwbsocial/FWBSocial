@@ -186,7 +186,7 @@ struct SignInView: View {
             do {
                 try await AuthService.shared.login(email: email.trimmed, password: password)
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isWorking = false
         }
@@ -283,7 +283,7 @@ struct RegisterView: View {
                     email: email.trimmed,
                     password: password)
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isWorking = false
         }
@@ -358,7 +358,7 @@ struct ForgotPasswordView: View {
                 try await AuthService.shared.forgotPassword(email: email.trimmed)
                 didSend = true
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isWorking = false
         }

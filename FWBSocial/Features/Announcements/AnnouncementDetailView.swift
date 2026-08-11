@@ -107,7 +107,7 @@ struct AnnouncementDetailView: View {
         } catch {
             // A preloaded row is better than an error screen — only surface the
             // failure when there's nothing at all to show.
-            if announcement == nil { errorMessage = error.localizedDescription }
+            if announcement == nil { errorMessage = error.fwbMessage }
         }
         isLoading = false
     }

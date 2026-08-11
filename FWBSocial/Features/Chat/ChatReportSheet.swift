@@ -169,7 +169,7 @@ struct ChatReportSheet: View {
             )
             didSubmit = true
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = error.fwbMessage
         }
     }
 }

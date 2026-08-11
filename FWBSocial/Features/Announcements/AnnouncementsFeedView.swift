@@ -230,7 +230,7 @@ struct AnnouncementsFeedView: View {
                 }
                 await reload()
             } catch {
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -242,7 +242,7 @@ struct AnnouncementsFeedView: View {
                 toasts.success("Moved back to draft")
                 await reload()
             } catch {
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -255,7 +255,7 @@ struct AnnouncementsFeedView: View {
                 toasts.success("Deleted")
                 await reload()
             } catch {
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }

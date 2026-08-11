@@ -128,6 +128,7 @@ struct FriendingWindowView: View {
 // MARK: - Attendee card
 
 private struct AttendeeCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let attendee: EventAttendeeDTO
     let isSending: Bool
     let hasSent: Bool
@@ -142,7 +143,12 @@ private struct AttendeeCard: View {
                 VStack(spacing: 2) {
                     Text(attendee.displayName)
                         .font(Theme.Typography.rowTitle)
-                        .lineLimit(1)
+                        // These cells are `GridItem(.adaptive(minimum: 150))`, and
+                        // one line of a 150pt cell at the accessibility sizes is
+                        // about two characters — a roster of people you cannot
+                        // name is not a roster. Let it wrap instead.
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .multilineTextAlignment(.center)
                     if let bio = attendee.bio, !bio.isEmpty {
                         Text(bio)
                             .font(Theme.Typography.micro)

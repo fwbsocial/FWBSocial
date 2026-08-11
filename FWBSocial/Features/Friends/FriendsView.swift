@@ -217,7 +217,7 @@ struct FriendsView: View {
             codeDraft = ""
             await load()
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = error.fwbMessage
         }
     }
 

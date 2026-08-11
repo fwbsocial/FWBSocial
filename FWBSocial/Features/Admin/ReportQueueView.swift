@@ -146,7 +146,7 @@ struct ReportQueueView: View {
                 toasts.success("Assigned to you.")
             } catch {
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -177,6 +177,7 @@ struct ReportQueueView: View {
 // MARK: - Row
 
 private struct ReportRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let report: ReportResponse
     var resolve: () -> Void
     var assign: () -> Void
@@ -205,7 +206,11 @@ private struct ReportRow: View {
                 Text(details)
                     .font(Theme.Typography.preview)
                     .foregroundStyle(.primary)
-                    .lineLimit(3)
+                    // What the reporter actually wrote is the substance of the
+                    // report. Clipping it at three lines costs a moderator the
+                    // reason they were called, so at accessibility sizes — where
+                    // three lines is a sentence — it runs full length.
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
             }
 
             HStack(spacing: Theme.Spacing.sm) {

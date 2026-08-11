@@ -152,7 +152,7 @@ struct TermsAcceptanceView: View {
             } catch {
                 // A 409 means the hosted text moved on and this build is showing
                 // the old version — an "update the app" problem, not a retry.
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isWorking = false
         }
@@ -335,7 +335,7 @@ struct AgeGateBlockedView: View {
             do {
                 try await AuthService.shared.deleteAccount()
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = error.fwbMessage
             }
             isDeleting = false
         }

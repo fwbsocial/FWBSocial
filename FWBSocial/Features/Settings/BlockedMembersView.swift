@@ -137,7 +137,7 @@ struct BlockedMembersView: View {
                 toasts.success("Unblocked \(member.name).")
             } catch {
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }

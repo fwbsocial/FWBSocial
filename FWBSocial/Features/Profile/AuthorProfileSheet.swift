@@ -199,7 +199,7 @@ struct AuthorProfileSheet: View {
             } catch {
                 isWorking = false
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }
@@ -215,7 +215,7 @@ struct AuthorProfileSheet: View {
             } catch {
                 isWorking = false
                 guard !isCancellationError(error) else { return }
-                toasts.error(error.localizedDescription)
+                toasts.error(error.fwbMessage)
             }
         }
     }

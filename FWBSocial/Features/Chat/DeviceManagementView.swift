@@ -130,7 +130,7 @@ struct DeviceManagementView: View {
         ) { device in
             Button("Revoke", role: .destructive) {
                 Task {
-                    do { try await chat.revokeDevice(device) } catch { errorMessage = error.localizedDescription }
+                    do { try await chat.revokeDevice(device) } catch { errorMessage = error.fwbMessage }
                     revokeTarget = nil
                 }
             }

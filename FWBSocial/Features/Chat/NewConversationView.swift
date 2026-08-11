@@ -171,7 +171,7 @@ struct NewConversationView: View {
             dismiss()
             AppState.shared.pendingConversationId = conversation.id
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            errorMessage = error.fwbMessage
         }
     }
 }
