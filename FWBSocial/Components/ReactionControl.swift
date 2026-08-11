@@ -62,6 +62,23 @@ struct ReactionControl: View {
         }
         .animation(Theme.Motion.bubble, value: isExpanded)
         .animation(Theme.Motion.chrome, value: current)
+        // **Drop the optimistic override as soon as the server's own numbers
+        // arrive.** Without this the local delta is added on top of a count that
+        // already includes it, and a single tap renders as 2 — observed in the
+        // Phase 4 smoke, where reacting once and then posting a comment (which
+        // refetches the post) double-counted.
+        //
+        // The view keeps its identity across a refetch, so `@State` survives the
+        // new inputs; only an explicit reset clears it. Any change to either
+        // input means the caller re-read the post, and the re-read is by
+        // definition more authoritative than a guess made before it.
+        .onChange(of: count) { _, _ in clearOptimistic() }
+        .onChange(of: myReaction) { _, _ in clearOptimistic() }
+    }
+
+    private func clearOptimistic() {
+        optimistic = nil
+        optimisticDelta = 0
     }
 
     // MARK: - Collapsed
@@ -93,6 +110,7 @@ struct ReactionControl: View {
                 in: Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("reaction.toggle")
         .disabled(!canReact)
         .accessibilityLabel(current.map { "Reacted \($0.label). \(displayCount) reactions." }
                             ?? "React. \(displayCount) reactions.")
