@@ -32,7 +32,24 @@ nonisolated enum FWBConfig {
     /// The active environment.
     static let current: FWBEnvironment = .production
 
-    static var baseURL: String { current.baseURL }
+    /// The API host.
+    ///
+    /// `FWB_API_BASE` overrides it, **in DEBUG builds only**. This exists for the
+    /// end-to-end smoke: an E2EE round trip needs two vetted accounts, vetting is
+    /// granted only by an admin or a Luma check-in, and production deliberately has
+    /// no admin — so the round trip has to run against a local server, and the base
+    /// URL is the one thing that has to change to let it.
+    ///
+    /// Compiled out of Release so a shipped build cannot be pointed anywhere by an
+    /// environment variable.
+    static var baseURL: String {
+        #if DEBUG
+        if let override = ProcessInfo.processInfo.environment["FWB_API_BASE"], !override.isEmpty {
+            return override
+        }
+        #endif
+        return current.baseURL
+    }
 
     /// Sent as `X-App-Id` on every request.
     static let appId = "fwb-ios"

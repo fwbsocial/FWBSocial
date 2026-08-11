@@ -74,6 +74,11 @@ final class ChatService {
     private var realtimeTask: Task<Void, Never>?
     private var typingClearTask: Task<Void, Never>?
 
+    /// Single-flight guard for device enrolment. Two callers fire at launch, and
+    /// without this both self-promote to root and one clobbers the other's row —
+    /// see `registerDeviceIfNeeded`.
+    private var registrationTask: Task<Void, Never>?
+
     /// Decrypted group keys, `conversationId → version → key`. In memory only: an
     /// on-disk copy would be a second place group keys live, and the fetch is cheap.
     private var groupKeys: [UUID: [Int: SymmetricKey]] = [:]
@@ -168,12 +173,61 @@ final class ChatService {
 
     // MARK: - Device enrolment
 
-    /// Register (or re-register) this device.
+    /// Register this device — **only if it is not already registered.**
     ///
-    /// Idempotent by construction: the server's upsert key is
-    /// `(user_id, identity_key)` and the identity key is stable in the keychain, so
-    /// calling this on every launch reconciles rather than proliferating rows.
+    /// The "if needed" is load-bearing, and both halves of it were found by the
+    /// round-trip smoke rather than reasoned out in advance.
+    ///
+    /// # 1. Re-registering an approved device UN-APPROVES it
+    ///
+    /// `ChatDeviceController.register` recomputes approval on every call:
+    ///
+    ///     device.isApproved = isRoot || (approvalSignature != nil && enrolledByDeviceId != nil)
+    ///
+    /// A second device that was approved by the first is not root, and this client
+    /// has nothing to resend — `ChatDeviceResponse` returns neither
+    /// `approval_signature` nor `enrolled_by_device_id`, so the credentials that
+    /// approved it are not readable back. A blind re-register on every launch
+    /// therefore flips an approved second phone to pending, silently, right after
+    /// the member approved it. Observed: a re-registration logged
+    /// `root: false, approved: false` against a row that had been `approved: true`.
+    ///
+    /// The client fix is not to call it. If the keychain holds a device id and the
+    /// server still lists that device as active, this is already registered and
+    /// there is nothing to do. **The server-side hazard remains and is reported
+    /// separately** — a client that did need to re-register (key rotation, say)
+    /// would still trip it.
+    ///
+    /// # 2. Concurrent registration races itself
+    ///
+    /// Two callers legitimately fire at launch — the app's own `start()` and
+    /// whatever screen appears first. Un-guarded, both read "zero approved devices",
+    /// both self-promote to root, and the second's write lands on the first's row.
+    /// The single-flight guard below makes the second caller await the first rather
+    /// than duplicate it.
     func registerDeviceIfNeeded() async {
+        if let inFlight = registrationTask {
+            await inFlight.value
+            return
+        }
+        let task = Task { await performRegistration() }
+        registrationTask = task
+        await task.value
+        registrationTask = nil
+    }
+
+    private func performRegistration() async {
+        // Already enrolled? Adopt the existing row and stop. This is the common
+        // path on every launch after the first.
+        if let existingId = await encryption.deviceId(),
+           let devices = try? await ChatAPI.myDevices(),
+           let mine = devices.first(where: { $0.id == existingId && $0.isActive }) {
+            myDevices = devices
+            thisDevice = mine
+            enrolmentError = nil
+            return
+        }
+
         do {
             let identityKey = try await encryption.identityPublicKeyBase64()
             let signingKey = try await encryption.signingPublicKeyBase64()

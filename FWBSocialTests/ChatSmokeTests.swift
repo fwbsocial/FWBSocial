@@ -39,7 +39,9 @@ import Foundation
 @Suite(.serialized)
 struct ChatSmokeTests {
 
-    private static var isEnabled: Bool { ProcessInfo.processInfo.environment["FWB_SMOKE"] == "1" }
+    // Gated with `.enabled(if:)`, NOT a `#require` inside the body: a failed
+    // `#require` is a FAILING test, not a skipped one, so guarding that way turned
+    // every routine `xcodebuild test` red. The trait skips.
 
     private static var baseURL: String {
         ProcessInfo.processInfo.environment["FWB_SMOKE_BASE"] ?? FWBConfig.baseURL
@@ -64,11 +66,12 @@ struct ChatSmokeTests {
     // A green `bindingVerified` is the only proof that all three are right, and it
     // cannot be obtained from a unit test.
 
-    @Test("Device enrolment: keys generate, the PQ binding verifies server-side, and device #1 self-approves")
+    @Test(
+        "Device enrolment: keys generate, the PQ binding verifies server-side, and device #1 self-approves",
+        .enabled(if: ProcessInfo.processInfo.environment["FWB_SMOKE"] == "1")
+    )
     @MainActor
     func deviceEnrolmentAgainstProduction() async throws {
-        try #require(Self.isEnabled, "set FWB_SMOKE=1 to run")
-
         try await TempAccount.run(baseURL: Self.baseURL) {
             await ChatService.shared.registerDeviceIfNeeded()
 
@@ -103,11 +106,12 @@ struct ChatSmokeTests {
         }
     }
 
-    @Test("A pending member reaches device registration but not the rest of chat")
+    @Test(
+        "A pending member reaches device registration but not the rest of chat",
+        .enabled(if: ProcessInfo.processInfo.environment["FWB_SMOKE"] == "1")
+    )
     @MainActor
     func vettingGateShape() async throws {
-        try #require(Self.isEnabled, "set FWB_SMOKE=1 to run")
-
         try await TempAccount.run(baseURL: Self.baseURL) {
             // Outside the gate — this is the §4.6 exception, and it must keep
             // working.
