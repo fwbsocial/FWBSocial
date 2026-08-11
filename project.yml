@@ -13,7 +13,7 @@ settings:
     SWIFT_APPROACHABLE_CONCURRENCY: "YES"
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: NVT8G575R7
-    TARGETED_DEVICE_FAMILY: "1,2"
+    TARGETED_DEVICE_FAMILY: "1"  # iPhone-only v1 — iPad needs its own design pass + screenshots
 
 schemes:
   FWBSocial:

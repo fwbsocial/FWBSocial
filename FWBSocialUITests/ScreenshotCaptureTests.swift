@@ -222,8 +222,13 @@ final class ScreenshotCaptureTests: XCTestCase {
 
         // Mika's side must have decrypted before replying, otherwise the capture is
         // a one-sided thread with a row of "can't be decrypted" placeholders.
-        let firstIncoming = app.staticTexts[Self.mikaMessages[0]]
-        XCTAssertTrue(firstIncoming.waitForExistence(timeout: timeout),
+        //
+        // Assert on the LAST message, not the first: the thread is a lazy scroll
+        // view pinned to the bottom, so the earlier bubbles are not realised and
+        // `exists` is false for them — which failed a run that had in fact
+        // decrypted everything perfectly.
+        let latestIncoming = app.staticTexts[Self.mikaMessages[Self.mikaMessages.count - 1]]
+        XCTAssertTrue(latestIncoming.waitForExistence(timeout: timeout),
                       "Mika's messages should decrypt on this device. Tree:\n\(app.debugDescription)")
 
         for reply in Self.adaReplies where !app.staticTexts[reply].exists {
