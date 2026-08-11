@@ -21,50 +21,19 @@ import SwiftUI
 struct FriendsView: View {
     @State private var friends: [FriendDTO] = []
     @State private var requests: [FriendRequestDTO] = []
-    @State private var codeDraft = ""
-    @State private var lookupResult: FriendCodeLookupResponse?
     @State private var isLoading = true
     @State private var isWorking = false
     @State private var errorMessage: String?
-    @State private var statusMessage: String?
     /// The list failed to load, as opposed to an individual action failing.
     @State private var loadError: Error?
 
     var body: some View {
         Form {
-            Section {
-                HStack {
-                    TextField("ABCD1234", text: $codeDraft)
-                        .textInputAutocapitalization(.characters)
-                        .autocorrectionDisabled()
-                        .monospaced()
-                        .accessibilityIdentifier("friends.code")
-                    Button("Find") { Task { await lookup() } }
-                        .disabled(codeDraft.trimmingCharacters(in: .whitespaces).count != 8 || isWorking)
-                }
-
-                if let lookupResult {
-                    HStack(spacing: Theme.Spacing.md) {
-                        AvatarView(name: lookupResult.displayName, url: lookupResult.avatarUrl)
-                            .frame(width: 40, height: 40)
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(lookupResult.displayName).font(Theme.Typography.rowTitle)
-                            if let username = lookupResult.username {
-                                Text("@\(username)").font(Theme.Typography.micro).foregroundStyle(.secondary)
-                            }
-                        }
-                        Spacer()
-                        Button("Add") { Task { await sendRequest(to: lookupResult.userId) } }
-                            .buttonStyle(FWBPrimaryButtonStyle())
-                            .disabled(isWorking)
-                            .accessibilityIdentifier("friends.add")
-                    }
-                }
-            } header: {
-                Text("Add by friend code")
-            } footer: {
-                Text("Your own code is on your profile. Codes are exact — there's no search, on purpose.")
-            }
+            // The entry flow itself lives in `AddFriendByCode.swift` — the Events
+            // tab and the event roster present the same thing as a sheet, and a
+            // lookup whose defining property is that all its failures look alike
+            // must not exist in three copies.
+            AddFriendByCodeSection { Task { await load() } }
 
             if !requests.isEmpty {
                 Section("Requests") {
@@ -141,9 +110,9 @@ struct FriendsView: View {
                 Text("Friends")
             }
 
-            if let statusMessage {
-                Section { Text(statusMessage).font(Theme.Typography.caption).foregroundStyle(.secondary) }
-            }
+            // "Request sent." now belongs to the shared section that sent it; what
+            // is left here reports the actions this screen still owns — accept,
+            // decline, unfriend, start a conversation.
             if let errorMessage {
                 Section { FormErrorText(message: errorMessage) }
             }
@@ -190,34 +159,6 @@ struct FriendsView: View {
         } catch {
             guard !isCancellationError(error) else { return }
             loadError = error
-        }
-    }
-
-    private func lookup() async {
-        isWorking = true
-        defer { isWorking = false }
-        errorMessage = nil
-        lookupResult = nil
-        do {
-            lookupResult = try await FriendsAPI.lookup(code: codeDraft.trimmingCharacters(in: .whitespaces))
-        } catch {
-            // One message for every refusal. Saying "that code doesn't exist" versus
-            // "they blocked you" would turn this into an oracle.
-            errorMessage = "No member with that code."
-        }
-    }
-
-    private func sendRequest(to userId: UUID) async {
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            _ = try await FriendsAPI.sendRequest(to: userId, source: .friendCode)
-            statusMessage = "Request sent."
-            lookupResult = nil
-            codeDraft = ""
-            await load()
-        } catch {
-            errorMessage = error.fwbMessage
         }
     }
 
