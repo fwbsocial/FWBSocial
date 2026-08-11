@@ -65,6 +65,12 @@ final class ForumSmokeTests: XCTestCase {
 
         deleteOwnPost()
         shoot("07-after-delete")
+
+        // Guideline 1.2's headline mechanism, on someone else's content —
+        // reporting your own is refused server-side ("You can't report your own
+        // content"), and the UI correspondingly hides the affordance there.
+        reportSeededPost()
+        shoot("09-after-report")
     }
 
     // MARK: - Steps
@@ -231,6 +237,35 @@ final class ForumSmokeTests: XCTestCase {
         // Confirmation dialog.
         let confirm = app.buttons["Delete"].firstMatch
         if confirm.waitForExistence(timeout: 5) { confirm.tap() }
+    }
+
+    /// Opens the admin's seeded pinned post and reports it.
+    private func reportSeededPost() {
+        let seeded = app.staticTexts["Welcome to the channels"]
+        XCTAssertTrue(seeded.waitForExistence(timeout: timeout),
+                      "back on the feed, the seeded post should be there")
+        seeded.tap()
+
+        let menu = app.buttons["thread.menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: timeout), "post detail should appear")
+        menu.tap()
+
+        let report = app.buttons["Report"].firstMatch
+        XCTAssertTrue(report.waitForExistence(timeout: timeout),
+                      "another member's post must offer Report")
+        report.tap()
+
+        let reason = app.buttons["Spam"].firstMatch
+        XCTAssertTrue(reason.waitForExistence(timeout: timeout), "the reason picker should appear")
+        reason.tap()
+        shoot("08-report-sheet")
+
+        let submit = app.buttons["Submit"].firstMatch
+        XCTAssertTrue(submit.isEnabled, "Submit should enable once a reason is chosen")
+        submit.tap()
+
+        XCTAssertTrue(menu.waitForExistence(timeout: timeout),
+                      "the sheet should dismiss back to the thread")
     }
 
     // MARK: - Helpers
