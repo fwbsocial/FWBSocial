@@ -50,6 +50,7 @@ struct PostComposerView: View {
             Form {
                 Section {
                     TextField("Title", text: $title)
+                        .accessibilityIdentifier("composer.title")
                         .focused($focus, equals: .title)
                         .submitLabel(.next)
                         .onSubmit { focus = .body }
@@ -62,6 +63,7 @@ struct PostComposerView: View {
 
                 Section {
                     TextField("What's on your mind?", text: $body_, axis: .vertical)
+                        .accessibilityIdentifier("composer.body")
                         .lineLimit(8...20)
                         .focused($focus, equals: .body)
                 } header: {
@@ -89,6 +91,7 @@ struct PostComposerView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isEditing ? "Save" : "Post") { save() }
+                        .accessibilityIdentifier("composer.submit")
                         .disabled(!canSave)
                 }
             }

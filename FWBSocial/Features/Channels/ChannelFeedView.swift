@@ -109,6 +109,7 @@ struct ChannelFeedView: View {
                         Image(systemName: "square.and.pencil")
                     }
                     .accessibilityLabel("New post")
+                    .accessibilityIdentifier("channel.newPost")
                 }
             }
         }

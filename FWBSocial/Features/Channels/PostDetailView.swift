@@ -86,6 +86,7 @@ struct PostDetailView: View {
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
+                    .accessibilityIdentifier("thread.menu")
                 }
             }
         }
@@ -359,6 +360,7 @@ struct PostDetailView: View {
 
             HStack(spacing: Theme.Spacing.sm) {
                 TextField("Add a comment", text: $draft, axis: .vertical)
+                    .accessibilityIdentifier("thread.commentField")
                     .lineLimit(1...5)
                     .focused($isComposerFocused)
                     .padding(.horizontal, Theme.Spacing.md)
@@ -373,6 +375,7 @@ struct PostDetailView: View {
                         .foregroundStyle(canSend ? Theme.Colors.brand : Color.secondary.opacity(0.5))
                 }
                 .disabled(!canSend)
+                .accessibilityIdentifier("thread.send")
                 .accessibilityLabel(editingComment == nil ? "Send comment" : "Save comment")
             }
         }

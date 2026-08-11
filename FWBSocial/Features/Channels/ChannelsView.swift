@@ -60,6 +60,7 @@ struct ChannelsView: View {
                 } label: {
                     ChannelRow(channel: channel)
                 }
+                .accessibilityIdentifier("channel.\(channel.slug)")
             }
 
             if isLoading && channels.isEmpty {
