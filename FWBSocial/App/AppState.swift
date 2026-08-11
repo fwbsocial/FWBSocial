@@ -61,8 +61,10 @@ nonisolated enum FWBFeatures {
     /// Phase 4 (PLAN.md §4.2). **Live** — channels, posts, comments, reactions,
     /// report/block and the moderator queue all run against deployed routes.
     static let channels = true
-    /// Phase 2/7 — Luma events and post-event friending (§4.5, §7).
-    static let events = false
+    /// Phase 2/7 — Luma events and post-event friending (§4.5, §7). **Live** —
+    /// `/api/events/windows`, the roster route and the Luma-email linking flow are
+    /// all deployed.
+    static let events = true
     /// Phase 6 — E2EE chat (§4.3). **Live**: device enrolment, 1:1 and group
     /// threads, receipts, the offline outbox and the history handoff all run
     /// against deployed routes.
@@ -121,6 +123,13 @@ final class AppState {
     /// True while the auth sheet should be up. Any screen can raise it.
     var isPresentingAuth = false
 
+    /// The Events tab's `NavigationStack` path — Luma event ids.
+    var eventPath: [String] = []
+
+    /// A friending window to open once the tab is up. Set by the
+    /// `FRIENDING_WINDOW` push, consumed and cleared by `EventsView`.
+    var pendingEventId: String?
+
     /// Raised by a `DEVICE_APPROVAL` push — a second device is waiting, and that
     /// push exists because the WebSocket frame only reaches a foregrounded app.
     var isPresentingDevices = false
@@ -131,6 +140,14 @@ final class AppState {
     func openAnnouncement(id: String) {
         selectedTab = .home
         pendingAnnouncementId = id
+    }
+
+    /// Route to a friending window from a notification tap. The window is only 48
+    /// hours long and this push is the only thing that announces it opened, so it
+    /// deep-links to the roster rather than dropping the member on the tab.
+    func openFriendingWindow(lumaEventId: String) {
+        selectedTab = .events
+        pendingEventId = lumaEventId
     }
 
     /// Route to a conversation from a notification tap. The APNs payload carries the

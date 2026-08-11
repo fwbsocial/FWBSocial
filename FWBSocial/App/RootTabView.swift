@@ -34,7 +34,11 @@ struct RootTabView: View {
 
             if FWBTab.events.isEnabled {
                 Tab(FWBTab.events.title, systemImage: FWBTab.events.systemImage, value: FWBTab.events) {
-                    NavigationStack { memberOnly(EventsView(), tab: .events) }
+                    // Path in AppState so a FRIENDING_WINDOW push can deep-link the
+                    // roster on a tab that was never opened.
+                    NavigationStack(path: $appState.eventPath) {
+                        memberOnly(EventsView(), tab: .events)
+                    }
                 }
             }
 

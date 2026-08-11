@@ -25,6 +25,10 @@ enum PendingPush: Sendable, Equatable {
     /// The body the member reads is produced by the notification extension, on
     /// device; this is only the tap route.
     case conversation(id: UUID)
+    /// A post-event friending window just opened. Carries `luma_event_id` so the
+    /// tap lands on the roster, not the tab — the window is 48 hours long and this
+    /// push is the only announcement of it.
+    case friendingWindow(lumaEventId: String)
     /// A second device registered and is waiting to be approved. This push is the
     /// backstop, not an optimisation: the WebSocket `device_added` frame reaches
     /// only a foregrounded device (§4.3.3).
@@ -173,6 +177,12 @@ final class PushCoordinator {
             } else {
                 enqueue(.tab(.chat))
             }
+        case "FRIENDING_WINDOW":
+            if let id = userInfo["luma_event_id"], !id.isEmpty {
+                enqueue(.friendingWindow(lumaEventId: id))
+            } else {
+                enqueue(.tab(.events))
+            }
         case "DEVICE_APPROVAL":
             enqueue(.devices)
         case "FRIEND_REQUEST", "FRIEND_ACCEPTED":
@@ -206,6 +216,8 @@ final class PushCoordinator {
             appState.openAnnouncement(id: id)
         case .conversation(let id):
             appState.openConversation(id: id)
+        case .friendingWindow(let lumaEventId):
+            appState.openFriendingWindow(lumaEventId: lumaEventId)
         case .devices:
             appState.selectedTab = .chat
             appState.isPresentingDevices = true

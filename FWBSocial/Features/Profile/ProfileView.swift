@@ -21,6 +21,12 @@ struct ProfileView: View {
     @State private var isDeleting = false
     @State private var errorMessage: String?
 
+    @State private var lumaStatus: LumaEmailStatusDTO?
+
+    private func loadLumaStatus() async {
+        lumaStatus = try? await EventsAPI.lumaEmailStatus()
+    }
+
     var body: some View {
         Group {
             if let user = auth.user {
@@ -36,7 +42,10 @@ struct ProfileView: View {
         }
         .navigationTitle("Profile")
         .sheet(isPresented: $showEditProfile) { EditProfileView() }
-        .task { await auth.reloadUser() }
+        .task {
+            await auth.reloadUser()
+            await loadLumaStatus()
+        }
     }
 
     // MARK: Signed in
@@ -75,6 +84,26 @@ struct ProfileView: View {
                         .font(Theme.Typography.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                // The Luma-email link (§4.5.3). It lives in Membership rather than
+                // in a settings list because it is the mechanism by which a pending
+                // member becomes vetted — for a Sign in with Apple member using the
+                // private relay, it is the ONLY one. Shown even once verified, so
+                // there is somewhere to change it.
+                NavigationLink {
+                    LumaEmailLinkView(status: lumaStatus) { await loadLumaStatus() }
+                } label: {
+                    LabeledContent("Luma email") {
+                        if let lumaStatus, lumaStatus.verified, let address = lumaStatus.lumaEmail {
+                            Text(address).lineLimit(1).truncationMode(.middle)
+                        } else if lumaStatus?.promptRequired == true {
+                            StatusBadge("Needed", color: Theme.Colors.caution)
+                        } else {
+                            Text("Not linked").foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .accessibilityIdentifier("profile.lumaEmail")
                 if user.isAdmin {
                     LabeledContent("Role", value: "Admin")
                 } else if user.isModerator {
