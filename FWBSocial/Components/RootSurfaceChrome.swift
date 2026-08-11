@@ -100,37 +100,50 @@ extension View {
     }
 }
 
-// MARK: - Contextual compose action (navigation bar)
+// MARK: - Contextual compose action (trailing tab-bar slot)
 
 extension View {
-    /// The surface's single contextual action, as a navigation-bar trailing item —
-    /// owner directive 2026-08-11 (moved up from a floating bottom-right button so
-    /// it shares the chrome row instead of costing its own corner).
+    /// Registers the surface's single contextual action into the tab bar's
+    /// conditional fifth slot — owner directive 2026-08-11: the four tabs stay
+    /// grouped left; the trailing slot appears only when the current surface has
+    /// an action, and is whatever that surface needs (compose, new message, …).
     ///
-    /// `isVisible: false` renders nothing at all rather than a disabled button —
-    /// a greyed-out action still advertises a capability the member does not have,
-    /// and visibility is an authorisation question every time (admin-only on Feed,
-    /// `mayPost` on a channel).
-    @ViewBuilder
+    /// `isVisible: false` registers nothing — a greyed-out action would still
+    /// advertise a capability the member does not have, and visibility is an
+    /// authorisation question every time (admin-only on Feed, `mayPost` on a
+    /// channel).
+    ///
+    /// Registration is scoped to the surface's presence: pushing a detail screen
+    /// over it (or leaving the tab) clears the slot via `onDisappear`.
     func floatingAction(
         isVisible: Bool,
         systemImage: String,
         label: String,
         action: @escaping () -> Void
     ) -> some View {
-        if isVisible {
-            toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: action) {
-                        Image(systemName: systemImage)
-                    }
-                    .accessibilityLabel(label)
-                    .accessibilityIdentifier("fab")
-                }
-            }
-        } else {
-            self
-        }
+        modifier(ContextualActionRegistrar(
+            isVisible: isVisible, systemImage: systemImage, label: label, action: action))
+    }
+}
+
+private struct ContextualActionRegistrar: ViewModifier {
+    @Environment(AppState.self) private var appState
+    let isVisible: Bool
+    let systemImage: String
+    let label: String
+    let action: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { register() }
+            .onDisappear { appState.contextualAction = nil }
+            .onChange(of: isVisible) { register() }
+    }
+
+    private func register() {
+        appState.contextualAction = isVisible
+            ? .init(systemImage: systemImage, label: label, handler: action)
+            : nil
     }
 }
 

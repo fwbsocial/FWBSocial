@@ -26,7 +26,7 @@ enum Theme {
     // Jade greens derived from the app icon's pine-green background
     // (ClubhouseBack.png, dominant #204038, hue ~165°) — owner directive
     // 2026-08-10. The flat accent lives in the AccentColor asset so it can
-    // adapt per appearance (light #25735F, dark #56BFA5) and stays in sync
+    // adapt per appearance (light #25735F, dark #3E9A72 — greener, deeper than the first mint pass per owner feedback) and stays in sync
     // with the system tint; deep/light bracket the same hue for gradients.
     nonisolated enum Brand {
         /// Flat accent — used for tints, links, toggles. Adaptive via asset.
@@ -34,7 +34,7 @@ enum Theme {
         /// Gradient start / pressed state.
         static let deep  = Color(hex: 0x1B584A)
         /// Gradient end / highlights.
-        static let light = Color(hex: 0x63C4A9)
+        static let light = Color(hex: 0x4FAE85)
     }
 
     // MARK: Semantic color tokens

@@ -65,8 +65,28 @@ struct RootTabView: View {
                 }
             }
 
+            // The conditional fifth slot (owner directive 2026-08-11): four tabs
+            // grouped left, one contextual action on the right — present only when
+            // the current surface registered one. `role: .search` gives it the
+            // system's separated trailing treatment; selecting it never navigates
+            // (see the onChange intercept below).
+            if let contextual = appState.contextualAction {
+                Tab(contextual.label, systemImage: contextual.systemImage,
+                    value: FWBTab.compose, role: .search) {
+                    Color.clear // never shown — selection is intercepted
+                }
+            }
+
         }
         .tint(Theme.Colors.brand)
+        // The compose slot is an action, not a destination: fire the registered
+        // handler and snap the selection back before the empty content can render.
+        .onChange(of: appState.selectedTab) { previous, current in
+            if current == .compose {
+                appState.selectedTab = previous
+                appState.contextualAction?.handler()
+            }
+        }
         .sheet(isPresented: $appState.isPresentingAuth) { AuthFlowView() }
         .sheet(isPresented: $appState.isPresentingDevices) {
             NavigationStack { DeviceManagementView() }

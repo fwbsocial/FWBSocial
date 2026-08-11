@@ -18,6 +18,14 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
     case channels
     case chat
     case events
+    /// Not a destination — the conditional trailing slot (owner directive
+    /// 2026-08-11: four tabs grouped left, a contextual fifth on the right).
+    /// Selecting it fires the current surface's action and restores the
+    /// previous selection; it never presents content of its own.
+    case compose
+
+    /// The real, navigable tabs.
+    static var destinations: [FWBTab] { [.home, .channels, .chat, .events] }
 
     var id: String { rawValue }
 
@@ -27,6 +35,7 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
         case .channels: return "Channels"
         case .events:   return "Events"
         case .chat:     return "Chat"
+        case .compose:  return ""     // label comes from the registered action
         }
     }
 
@@ -38,6 +47,7 @@ enum FWBTab: String, CaseIterable, Identifiable, Hashable {
         case .channels: return "bubble.left.and.bubble.right"
         case .events:   return "calendar"
         case .chat:     return "message.fill"
+        case .compose:  return "square.and.pencil"
         }
     }
 }
@@ -88,6 +98,7 @@ extension FWBTab {
         case .events:   return FWBFeatures.events
         case .chat:     return FWBFeatures.chat
         case .home:     return true
+        case .compose:  return false  // never a destination; rendered separately
         }
     }
 }
@@ -100,6 +111,16 @@ final class AppState {
     static let shared = AppState()
 
     var selectedTab: FWBTab = .home
+
+    /// The contextual trailing tab-bar action (owner directive 2026-08-11).
+    /// Surfaces register on appear and clear on disappear via
+    /// `.floatingAction(...)`; nil = the fifth slot is absent entirely.
+    struct ContextualAction {
+        let systemImage: String
+        let label: String
+        let handler: () -> Void
+    }
+    var contextualAction: ContextualAction?
 
     /// The Home tab's `NavigationStack` path — announcement ids. Owned here
     /// rather than inside the view so a push can push a detail screen onto a tab
