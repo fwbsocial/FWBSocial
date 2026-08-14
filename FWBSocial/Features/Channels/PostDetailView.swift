@@ -40,6 +40,11 @@ struct PostDetailView: View {
 
     @FocusState private var isComposerFocused: Bool
 
+    /// Bumped by `focusComposer()`; the `.onChange` below is what actually moves
+    /// the caret. See `focusComposer()` for why the request has to travel as
+    /// state rather than as a direct write.
+    @State private var focusRequest = 0
+
     private var visibleComments: [ForumComment] {
         comments.filteringBlocked(blocks)
     }
@@ -79,6 +84,10 @@ struct PostDetailView: View {
             .padding()
         }
         .fwbDismissKeyboardOnTap()
+        // The one place the caret is moved programmatically. It has to be here,
+        // synchronously inside an update of the *live* view — see
+        // `focusComposer()`.
+        .onChange(of: focusRequest) { isComposerFocused = true }
         .navigationTitle("Thread")
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) {
@@ -325,7 +334,7 @@ struct PostDetailView: View {
                 if canComment && !comment.isRemoved && !comment.isReply {
                     Button("Reply") {
                         replyingTo = comment
-                        isComposerFocused = true
+                        focusComposer()
                     }
                     .font(Theme.Typography.caption)
                     .buttonStyle(.plain)
@@ -342,7 +351,7 @@ struct PostDetailView: View {
                 Button {
                     editingComment = comment
                     draft = comment.displayBody
-                    isComposerFocused = true
+                    focusComposer()
                 } label: {
                     Label("Edit", systemImage: "pencil")
                 }
@@ -419,12 +428,29 @@ struct PostDetailView: View {
 
     /// Put the caret in the comment field.
     ///
-    /// Off the current update deliberately: the tab slot's action fires during the
-    /// selection round-trip `RootTabView` performs to turn the trailing tab back
-    /// into a button, and a focus request made mid-restructure is granted against a
-    /// tree that is about to be replaced.
+    /// **Bumps a counter instead of writing `isComposerFocused`, and does even
+    /// that a turn late. Both halves are load-bearing** — this is follow-up
+    /// 97515738, measured 2026-08-14 rather than guessed at.
+    ///
+    /// `@FocusState` is not `@State`. Its storage is only wired to the focus
+    /// system for the copy of the view SwiftUI is *currently updating*; a write
+    /// from a closure that outlived that update — a `contextMenu` action UIKit
+    /// kept from when it built the menu, the handler `RootTabView` holds for the
+    /// tab slot, anything hopped onto a later runloop turn — lands on a dead
+    /// binding and is **silently dropped**. Reading the property back on the very
+    /// next line still says `false`, and no `.onChange` fires. That is why the
+    /// earlier attempts to fix this by *delaying* the write (one runloop turn,
+    /// 50ms, 350ms) all failed the same way: each one was a write to a dead
+    /// binding. `@State` has no such problem, so the request travels as state and
+    /// the `.onChange` in `body` does the focusing on the live view.
+    ///
+    /// The turn of delay is for the tab slot specifically. Requesting focus
+    /// synchronously out of the tab bar's own tap gets it granted and then revoked
+    /// within the one update (`false -> true -> false`); one turn later the tab
+    /// bar has finished with the tap and the caret stays. Cheap and harmless on
+    /// the Reply and Edit paths, which do not need it.
     private func focusComposer() {
-        Task { @MainActor in isComposerFocused = true }
+        Task { @MainActor in focusRequest &+= 1 }
     }
 
     private func contextChip(text: String, clear: @escaping () -> Void) -> some View {

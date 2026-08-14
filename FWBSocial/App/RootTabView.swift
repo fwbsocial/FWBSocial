@@ -20,7 +20,7 @@ struct RootTabView: View {
     var body: some View {
         @Bindable var appState = appState
 
-        TabView(selection: $appState.selectedTab) {
+        TabView(selection: composeInterceptingSelection) {
             Tab(FWBTab.home.title, systemImage: FWBTab.home.systemImage, value: FWBTab.home) {
                 // Path lives in AppState so an announcement push can navigate a
                 // tab the member hasn't opened yet.
@@ -104,15 +104,6 @@ struct RootTabView: View {
 
         }
         .tint(Theme.Colors.brand)
-        // The compose slot is an action, not a destination: fire the registered
-        // handler (if any — the slot is a space-holding no-op otherwise) and
-        // snap the selection back before the empty content can render.
-        .onChange(of: appState.selectedTab) { previous, current in
-            if current == .compose {
-                appState.selectedTab = previous
-                appState.contextualAction?.handler()
-            }
-        }
         .sheet(isPresented: $appState.isPresentingAuth) { AuthFlowView() }
         .sheet(isPresented: $appState.isPresentingDevices) {
             NavigationStack { DeviceManagementView() }
@@ -151,6 +142,34 @@ struct RootTabView: View {
             guard previous != nil, previous != current else { return }
             AppPrefetch.vettingDidChange()
         }
+    }
+
+    /// The tab selection, with the compose slot intercepted **before** it is ever
+    /// written to state.
+    ///
+    /// The slot is an action, not a destination. What this replaces was the
+    /// obvious shape — let the selection land on `.compose`, then snap it back in
+    /// `.onChange` and fire the handler there — and that round-trip was half of
+    /// follow-up 97515738. Measured 2026-08-14, with the handler asking for the
+    /// comment composer's caret: with the round-trip in place the focus request is
+    /// granted and then **immediately revoked** in the same update
+    /// (`false -> true -> false`), because restoring the selection restructures the
+    /// tab that owns the surface; and a request deferred past the round-trip is not
+    /// granted at all, because by then the binding it was aimed at is gone.
+    /// Refusing the selection outright leaves nothing to restore, nothing to
+    /// rebuild, and nothing to revoke — and it drops the transient render of the
+    /// slot's empty content the old comment was racing.
+    private var composeInterceptingSelection: Binding<FWBTab> {
+        Binding(
+            get: { appState.selectedTab },
+            set: { selected in
+                guard selected == .compose else {
+                    appState.selectedTab = selected
+                    return
+                }
+                // A space-holding no-op when the surface registered nothing.
+                appState.contextualAction?.handler()
+            })
     }
 
     /// Member-only tabs: the real screen when signed in, an honest prompt when
