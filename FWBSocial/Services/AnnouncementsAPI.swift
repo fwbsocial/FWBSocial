@@ -53,7 +53,23 @@ extension APIClient {
 
     /// A single announcement, by id. Used by the detail screen and by the push
     /// deep link, which can arrive before the feed has ever been loaded.
+    ///
+    /// Admins prefer `/api/admin/announcements/:id` first (follow-up D8811759):
+    /// the member and public detail routes both 404 a draft, correctly, for
+    /// those audiences, so an admin opening a draft cold — a deep link, or the
+    /// admin list before it's published — needs the route that doesn't apply
+    /// that filter. Same fallback shape as `announcementsFeed`'s admin branch:
+    /// a 403/404 here (not actually an admin, or the route moved) falls
+    /// through rather than erroring. Gated on `AuthService.shared.isAdmin`, so
+    /// a non-admin never calls the admin route.
     func announcement(id: String) async throws -> Announcement {
+        if AuthService.shared.isAdmin {
+            do {
+                return try await get("/api/admin/announcements/\(id)")
+            } catch let APIError.httpError(code, _) where code == 403 || code == 404 {
+                // Fall through to the member/public routes below.
+            }
+        }
         if isAuthenticated {
             do {
                 return try await get("/api/announcements/\(id)")

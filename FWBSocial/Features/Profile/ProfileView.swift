@@ -39,12 +39,18 @@ struct ProfileView: View {
             if let user = auth.user {
                 signedIn(user)
             } else {
+                // `fwbAppThemeSurface()` (applied by `DismissableSheet`, the
+                // Profile sheet's wrapper) paints via `.background { … }`, which
+                // covers only its content's frame. `EmptyStateView` sizes to fit,
+                // so without this the backdrop showed as a horizontal band with
+                // the system background above and below it (follow-up 2A688002).
                 EmptyStateView(
                     icon: "person.crop.circle",
                     title: "Not signed in",
                     message: "Sign in to see your profile, membership status and notification settings.",
                     actionTitle: "Sign in",
                     action: { appState.isPresentingAuth = true })
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .navigationTitle("Profile")
