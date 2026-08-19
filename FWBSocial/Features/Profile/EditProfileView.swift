@@ -67,11 +67,18 @@ struct EditProfileView: View {
         trimmedUsername.lowercased() != storedUsername.lowercased()
     }
 
-    /// Mirrors the server's `displayName` guard (1–50) so the member is stopped
-    /// by the field rather than by a 400.
+    /// Mirrors the server's `bio` guard (`AuthController.updateProfile`, ≤200)
+    /// so the member is stopped by the field rather than by a 400. The server
+    /// counts the *sanitized* string; the client sends `bio.trimmed`, so that is
+    /// what is counted here.
+    private let maxBio = 200
+
+    /// Mirrors the server's `displayName` guard (1–50) and `bio` guard (≤200) so
+    /// the member is stopped by the field rather than by a 400.
     private var canSave: Bool {
         !displayName.trimmed.isEmpty
             && displayName.trimmed.count <= 50
+            && bio.trimmed.count <= maxBio
             && !usernameState.blocksSave
             && !isSaving
             && !isUploadingPhoto
@@ -258,6 +265,31 @@ struct EditProfileView: View {
                 .accessibilityLabel("Bio")
         } header: {
             Text("Bio").fwbOnCanvas()
+        } footer: {
+            bioFooter
+        }
+    }
+
+    /// Silent until the member is within `bioWarningThreshold` of the limit —
+    /// a counter that is always on turns a one-line bio into a typing test.
+    /// Past the limit it goes red and Save is already dead (`canSave`).
+    private var bioWarningThreshold: Int { 20 }
+
+    @ViewBuilder
+    private var bioFooter: some View {
+        let count = bio.trimmed.count
+        let remaining = maxBio - count
+
+        if remaining < 0 {
+            Text("\(-remaining) over the \(maxBio)-character limit")
+                .foregroundStyle(Theme.Colors.danger)
+                .accessibilityIdentifier("editProfile.bioCount")
+        } else if remaining <= bioWarningThreshold {
+            Text("\(remaining) character\(remaining == 1 ? "" : "s") left")
+                .foregroundStyle(Theme.Colors.caution)
+                .accessibilityIdentifier("editProfile.bioCount")
+        } else {
+            Text("Up to \(maxBio) characters.").fwbOnCanvas()
         }
     }
 
