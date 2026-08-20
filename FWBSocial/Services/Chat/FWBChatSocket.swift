@@ -221,13 +221,30 @@ final class FWBChatSocket {
     /// queues behind a view update. A local decoder rather than `FWBJSON.decoder`:
     /// that one is MainActor-isolated under the target's default isolation, and
     /// hopping to the main actor just to parse would defeat the point. The strategy
-    /// is identical — snake_case keys, ISO8601 dates — and `WireContractTests` pins
-    /// the server side of it.
+    /// matches `FWBJSON` — snake_case keys, ISO8601 dates — except for dates: the
+    /// WS fan-out encoder emits fractional seconds (REST does not), and Foundation's
+    /// `.iso8601` strategy throws on those, silently nilling out every frame. So this
+    /// decoder parses fractional first and falls back to plain. The formatters are
+    /// built inside the closure on purpose: `decode` is nonisolated under the
+    /// target's MainActor default isolation, so a shared static or a MainActor helper
+    /// is not reachable from here. `WireContractTests` pins the server side of the
+    /// key strategy.
     nonisolated private static func decode(_ data: Data?) -> ChatWSFrame? {
         guard let data else { return nil }
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let string = try decoder.singleValueContainer().decode(String.self)
+            let fractional = ISO8601DateFormatter()
+            fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = fractional.date(from: string) { return date }
+            let plain = ISO8601DateFormatter()
+            plain.formatOptions = [.withInternetDateTime]
+            if let date = plain.date(from: string) { return date }
+            throw DecodingError.dataCorrupted(
+                .init(codingPath: decoder.codingPath,
+                      debugDescription: "Unrecognised ISO8601 date: \(string)"))
+        }
         return try? decoder.decode(ChatWSFrame.self, from: data)
     }
 
