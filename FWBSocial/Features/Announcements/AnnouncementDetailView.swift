@@ -7,6 +7,22 @@ import SwiftUI
 // The push case can arrive on a cold launch before the feed has ever loaded, so
 // this screen must be able to fetch its own subject rather than assuming a row
 // was handed to it. `preloaded` is an optimisation, not a requirement.
+//
+// # The screen belongs to `announcementId`, and nothing else
+//
+// Everything drawn here comes from `announcement`, which is `@State` — and state
+// survives the view being handed a NEW `announcementId`. That happens: a
+// `NavigationStack` destination is positional, so replacing the element already
+// at `announcementPath[0]` (which is exactly what an announcement push does while
+// a detail is open — `AnnouncementsFeedView`'s `pendingAnnouncementId` handler)
+// updates this view in place rather than building a fresh one. With an unkeyed
+// `.task` the load never re-ran, so the stack said one announcement and the
+// screen showed the previous one — the wrong announcement, under the right id.
+//
+// So the load is keyed on `announcementId`: the id changing cancels the old run,
+// re-seeds from the new `preloaded`, and fetches again. The two guards in
+// `load()` close the other half of it — a response that is late, or that is not
+// for the id being asked about, is dropped rather than written over the screen.
 
 struct AnnouncementDetailView: View {
     let announcementId: String
@@ -136,7 +152,10 @@ struct AnnouncementDetailView: View {
             }
             Button("Cancel", role: .cancel) { pendingDelete = nil }
         }
-        .task {
+        // `task(id:)`, NOT `task`: this view is reused in place when the pushed
+        // announcement changes underneath it, and an unkeyed task would leave the
+        // previous announcement's content on screen for the new id.
+        .task(id: announcementId) {
             announcement = preloaded
             await load()
             // Through the store, so the feed's dot clears the moment this screen
@@ -178,15 +197,25 @@ struct AnnouncementDetailView: View {
     }
 
     private func load() async {
+        let asked = announcementId
         isLoading = announcement == nil
         errorMessage = nil
+        // In a `defer` because the guards below return early, and a screen left
+        // spinning forever is a worse bug than the one they are preventing.
+        defer { isLoading = false }
         do {
-            announcement = try await APIClient.shared.announcement(id: announcementId)
+            let fetched = try await APIClient.shared.announcement(id: asked)
+            // Two ways a right-looking response is the wrong answer: the task was
+            // superseded while this was in flight (a new id was pushed), or the
+            // server handed back something other than what was asked for. Either
+            // way it must not become what the member is reading.
+            guard !Task.isCancelled, asked == announcementId else { return }
+            guard fetched.id.caseInsensitiveCompare(asked) == .orderedSame else { return }
+            announcement = fetched
         } catch {
             // A preloaded row is better than an error screen — only surface the
             // failure when there's nothing at all to show.
             if announcement == nil { errorMessage = error.fwbMessage }
         }
-        isLoading = false
     }
 }
