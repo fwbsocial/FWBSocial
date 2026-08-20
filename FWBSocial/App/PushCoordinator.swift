@@ -179,7 +179,7 @@ final class PushCoordinator {
         }
 
         switch category {
-        case "fwb_announcement":
+        case "ANNOUNCEMENT":
             if let id = userInfo["announcement_id"], !id.isEmpty {
                 enqueue(.announcement(id: id))
             } else {
@@ -209,7 +209,7 @@ final class PushCoordinator {
             enqueue(.reportQueue)
         case "FRIEND_REQUEST", "FRIEND_ACCEPTED":
             enqueue(.profile)
-        case "fwb_channel_post":
+        case "CHANNEL_POST":
             enqueue(.tab(.channels))
         default:
             // A push with no category but an announcement id is still routable —

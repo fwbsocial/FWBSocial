@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Announcement detail
 //
-// Reachable three ways: tapping a feed row, a push deep link (`fwb_announcement`
+// Reachable three ways: tapping a feed row, a push deep link (`ANNOUNCEMENT`
 // with an `announcement_id`), and — once the web side exists — a universal link.
 // The push case can arrive on a cold launch before the feed has ever loaded, so
 // this screen must be able to fetch its own subject rather than assuming a row
