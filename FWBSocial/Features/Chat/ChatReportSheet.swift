@@ -110,6 +110,9 @@ struct ChatReportSheet: View {
                     Section { FormErrorText(message: errorMessage) }
                 }
             }
+            // Background layer, never `.onTapGesture` on the Form itself — that
+            // kills every row control in it (house rule).
+            .fwbDismissKeyboardOnTap()
             .navigationTitle("Report message")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
