@@ -1,4 +1,5 @@
 import SwiftUI
+import ImageIO
 
 // MARK: - Generic component kit
 //
@@ -177,6 +178,7 @@ struct AvatarView: View {
     var size: CGFloat = 40
 
     @State private var loaded: UIImage?
+    @Environment(\.displayScale) private var displayScale
 
     var body: some View {
         Group {
@@ -209,12 +211,32 @@ struct AvatarView: View {
         // otherwise a re-mint of the same object would flash the monogram, which
         // is the whole thing this cache exists to prevent.
         loaded = nil
+        let maxPixelSize = Int(size * displayScale)
         guard let (data, response) = try? await FWBHTTP.session.data(from: parsed),
               let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
-              let image = UIImage(data: data)
+              let cgImage = await Self.downsampledCGImage(data: data, maxPixelSize: maxPixelSize)
         else { return }
+        let image = UIImage(cgImage: cgImage, scale: displayScale, orientation: .up)
         if let key { AvatarImageCache.shared.store(image, forKey: key) }
         loaded = image
+    }
+
+    /// Decodes straight to a thumbnail at (roughly) display size, instead of
+    /// materializing the source image at full resolution first — a photo
+    /// library upload can be several thousand pixels on a side for a view
+    /// drawn at 40-104pt. `nonisolated` (and `static`, so there is no `self`
+    /// to hop back to the main actor for) lets this run off the main actor;
+    /// `CGImage` is Sendable so it crosses back cleanly, and the caller builds
+    /// the `UIImage` on the main actor.
+    nonisolated private static func downsampledCGImage(data: Data, maxPixelSize: Int) async -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary)
     }
 
     private var initials: some View {
