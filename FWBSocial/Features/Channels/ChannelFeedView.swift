@@ -30,39 +30,38 @@ struct ChannelFeedView: View {
         _current = State(initialValue: channel)
     }
 
-    /// Blocked authors are filtered here, at render time rather than at fetch
-    /// time, so an unblock brings their posts back without a refetch. The server
-    /// does not do this for us — `Modules/Forum/` has no block join.
-    private var visiblePosts: [ForumPost] {
-        loader.items.filteringBlocked(blocks)
-    }
-
-    private var pinned: [ForumPost] { visiblePosts.filter(\.pinned) }
-    private var unpinned: [ForumPost] { visiblePosts.filter { !$0.pinned } }
-
     /// The SERVER's resolved role, never a computed one. An archived channel takes
     /// the composer away from everyone, poster or not.
     private var canPostHere: Bool { current.mayPost && !current.archived }
 
     var body: some View {
+        // Blocked authors are filtered here, at render time rather than at fetch
+        // time, so an unblock brings their posts back without a refetch. The server
+        // does not do this for us — `Modules/Forum/` has no block join. Bound once
+        // per body evaluation — pinned/unpinned and the two empty-state checks all
+        // read this same list rather than each re-running the filter.
+        let visible = loader.items.filteringBlocked(blocks)
+        let pinnedPosts = visible.filter(\.pinned)
+        let unpinnedPosts = visible.filter { !$0.pinned }
+
         List {
             Group {
                 // Only over content. With an empty feed the failure takes the whole
                 // surface below, where it can carry a Try again.
-                if let error = loader.error, !visiblePosts.isEmpty {
+                if let error = loader.error, !visible.isEmpty {
                     Section { InlineErrorRow(message: error) { Task { await reload() } } }
                 }
 
-                if !pinned.isEmpty {
+                if !pinnedPosts.isEmpty {
                     Section {
-                        ForEach(pinned) { post in row(post) }
+                        ForEach(pinnedPosts) { post in row(post) }
                     } header: {
                         Label("Pinned", systemImage: "pin.fill")
                     }
                 }
 
                 Section {
-                    ForEach(unpinned) { post in
+                    ForEach(unpinnedPosts) { post in
                         row(post)
                             .task { await loader.loadMoreIfNeeded(current: post, fetch) }
                     }
@@ -76,7 +75,7 @@ struct ChannelFeedView: View {
                     }
                 }
 
-                if visiblePosts.isEmpty && !loader.isLoading && hasLoaded {
+                if visible.isEmpty && !loader.isLoading && hasLoaded {
                     Section {
                         if let failure = loader.failure {
                             // "Start the first thread" over a failed fetch invites the
