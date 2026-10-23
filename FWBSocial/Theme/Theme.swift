@@ -217,7 +217,7 @@ extension View {
 // tight radius, so consecutive messages from one sender read as a single stack
 // with only the group's outer edges fully rounded.
 
-struct GroupedBubbleShape: Shape {
+nonisolated struct GroupedBubbleShape: Shape {
     var topLeading: CGFloat
     var topTrailing: CGFloat
     var bottomLeading: CGFloat
