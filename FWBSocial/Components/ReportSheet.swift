@@ -38,62 +38,67 @@ struct ReportSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    ForEach(ReportReason.allCases) { option in
-                        Button {
-                            reason = option
-                        } label: {
-                            HStack(spacing: Theme.Spacing.md) {
-                                Image(systemName: option.systemImage)
-                                    .frame(width: 24)
-                                    .foregroundStyle(reason == option ? Theme.Colors.brand : .secondary)
-                                    .accessibilityHidden(true)
-                                Text(option.label)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if reason == option {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(Theme.Colors.brand)
+                Group {
+                    Section {
+                        ForEach(ReportReason.allCases) { option in
+                            Button {
+                                reason = option
+                            } label: {
+                                HStack(spacing: Theme.Spacing.md) {
+                                    Image(systemName: option.systemImage)
+                                        .frame(width: 24)
+                                        .foregroundStyle(reason == option ? Theme.Colors.brand : .secondary)
                                         .accessibilityHidden(true)
+                                    Text(option.label)
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    if reason == option {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(Theme.Colors.brand)
+                                            .accessibilityHidden(true)
+                                    }
                                 }
                             }
+                            // Selection was signalled by tint and a checkmark glyph and
+                            // nothing else, so VoiceOver read every reason identically and
+                            // a member using it could not tell which one they had picked —
+                            // on the screen where picking the right one is the whole point.
+                            // The glyphs above are hidden because the trait now carries
+                            // that meaning, and "checkmark" spoken after the label does not.
+                            .accessibilityAddTraits(reason == option ? [.isSelected] : [])
                         }
-                        // Selection was signalled by tint and a checkmark glyph and
-                        // nothing else, so VoiceOver read every reason identically and
-                        // a member using it could not tell which one they had picked —
-                        // on the screen where picking the right one is the whole point.
-                        // The glyphs above are hidden because the trait now carries
-                        // that meaning, and "checkmark" spoken after the label does not.
-                        .accessibilityAddTraits(reason == option ? [.isSelected] : [])
-                    }
-                } header: {
-                    Text("Why are you reporting this \(targetType.subjectNoun)?")
-                } footer: {
-                    if let subjectName {
-                        Text("Reporting \(subjectName).")
-                    }
-                }
-
-                Section {
-                    TextField("Anything else we should know?", text: $details, axis: .vertical)
-                        .lineLimit(3...6)
-                } header: {
-                    Text("Details (optional)")
-                } footer: {
-                    Text("Moderators review every report, usually within 24 hours.")
-                }
-
-                if let blockableUserId, !blocks.isBlocked(blockableUserId) {
-                    Section {
-                        Toggle("Also block this member", isOn: $alsoBlock)
+                    } header: {
+                        Text("Why are you reporting this \(targetType.subjectNoun)?").fwbOnCanvas()
                     } footer: {
-                        Text("You won't see their posts or comments, and they can't reach you.")
+                        if let subjectName {
+                            Text("Reporting \(subjectName).").fwbOnCanvas()
+                        }
+                    }
+
+                    Section {
+                        TextField("Anything else we should know?", text: $details, axis: .vertical)
+                            .lineLimit(3...6)
+                    } header: {
+                        Text("Details (optional)").fwbOnCanvas()
+                    } footer: {
+                        Text("Moderators review every report, usually within 24 hours.").fwbOnCanvas()
+                    }
+
+                    if let blockableUserId, !blocks.isBlocked(blockableUserId) {
+                        Section {
+                            Toggle("Also block this member", isOn: $alsoBlock)
+                        } footer: {
+                            Text("You won't see their posts or comments, and they can't reach you.")
+                                .fwbOnCanvas()
+                        }
+                    }
+
+                    if let error {
+                        Section { FormErrorText(message: error) }
                     }
                 }
-
-                if let error {
-                    Section { FormErrorText(message: error) }
-                }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                .fwbThemedRows()
             }
             // Background layer, never `.onTapGesture` on the Form itself — that
             // kills every row control in it (house rule).
@@ -119,6 +124,8 @@ struct ReportSheet: View {
                         .accessibilityLabel("Sending your report")
                 }
             }
+            // Inside the stack — it does not cross a NavigationStack boundary.
+            .fwbAppThemeSurface()
         }
     }
 

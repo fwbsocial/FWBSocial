@@ -34,92 +34,106 @@ struct DeviceManagementView: View {
 
     var body: some View {
         Form {
-            if !chat.pendingDevices.isEmpty {
-                Section {
-                    ForEach(chat.pendingDevices) { device in
-                        pendingRow(device)
+            Group {
+                if !chat.pendingDevices.isEmpty {
+                    Section {
+                        ForEach(chat.pendingDevices) { device in
+                            pendingRow(device)
+                        }
+                    } header: {
+                        Text("Waiting for approval").fwbOnCanvas()
+                    } footer: {
+                        Text("Only approve a device you're holding. Approving one gives it your message history.")
+                            .fwbOnCanvas()
                     }
-                } header: {
-                    Text("Waiting for approval")
-                } footer: {
-                    Text("Only approve a device you're holding. Approving one gives it your message history.")
                 }
-            }
 
-            if let transfer = handoff.outgoing, !transfer.isTerminal {
-                Section {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        ProgressView(value: transfer.fraction)
-                        Text("Handing over history — \(transfer.deliveredMessages) of \(transfer.totalMessages) messages")
+                if let transfer = handoff.outgoing, !transfer.isTerminal {
+                    Section {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            ProgressView(value: transfer.fraction)
+                            Text("Handing over history — \(transfer.deliveredMessages) of \(transfer.totalMessages) messages")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, Theme.Spacing.xs)
+                    } header: {
+                        Text("Transfer in progress").fwbOnCanvas()
+                    } footer: {
+                        Text("Keep both devices on and this app open. If it's interrupted it picks up where it left off.")
+                            .fwbOnCanvas()
+                    }
+                }
+
+                if let incoming = handoff.incoming, !incoming.isTerminal {
+                    Section {
+                        ProgressView(value: incoming.fraction)
+                        Text("Receiving history — \(incoming.deliveredMessages) of \(incoming.totalMessages) messages")
                             .font(Theme.Typography.caption)
                             .foregroundStyle(.secondary)
+                    } header: {
+                        Text("Receiving history").fwbOnCanvas()
                     }
-                    .padding(.vertical, Theme.Spacing.xs)
-                } header: {
-                    Text("Transfer in progress")
-                } footer: {
-                    Text("Keep both devices on and this app open. If it's interrupted it picks up where it left off.")
                 }
-            }
 
-            if let incoming = handoff.incoming, !incoming.isTerminal {
                 Section {
-                    ProgressView(value: incoming.fraction)
-                    Text("Receiving history — \(incoming.deliveredMessages) of \(incoming.totalMessages) messages")
-                        .font(Theme.Typography.caption)
-                        .foregroundStyle(.secondary)
-                } header: {
-                    Text("Receiving history")
-                }
-            }
-
-            Section {
-                // loading → error → empty → content. The error branch reads the
-                // enrolment failure because that is what an empty device list almost
-                // always means: this phone never managed to register its keys, so
-                // there is nothing to list and saying "no devices" would blame the
-                // member for the app's problem.
-                if isLoadingDevices && approvedDevices.isEmpty {
-                    HStack {
-                        Spacer()
-                        ProgressView().accessibilityLabel("Loading your devices")
-                        Spacer()
-                    }
-                } else if approvedDevices.isEmpty, let enrolmentError = chat.enrolmentError {
-                    ErrorMessageStateView(message: enrolmentError) { Task { await refreshDevices() } }
+                    // loading → error → empty → content. The error branch reads the
+                    // enrolment failure because that is what an empty device list almost
+                    // always means: this phone never managed to register its keys, so
+                    // there is nothing to list and saying "no devices" would blame the
+                    // member for the app's problem.
+                    if isLoadingDevices && approvedDevices.isEmpty {
+                        HStack {
+                            Spacer()
+                            ProgressView().accessibilityLabel("Loading your devices")
+                            Spacer()
+                        }
+                    } else if approvedDevices.isEmpty, let enrolmentError = chat.enrolmentError {
+                        ErrorMessageStateView(message: enrolmentError) { Task { await refreshDevices() } }
+                            // A clear row sits on the canvas, not in a box.
+                            .fwbOnCanvas()
+                            .listRowBackground(Color.clear)
+                    } else if approvedDevices.isEmpty {
+                        EmptyStateView(
+                            icon: "iphone.slash",
+                            title: "No devices yet",
+                            message: "This phone appears here once it has finished setting up its encryption keys. Pull down to check again.")
+                        .fwbOnCanvas()
                         .listRowBackground(Color.clear)
-                } else if approvedDevices.isEmpty {
-                    EmptyStateView(
-                        icon: "iphone.slash",
-                        title: "No devices yet",
-                        message: "This phone appears here once it has finished setting up its encryption keys. Pull down to check again.")
-                    .listRowBackground(Color.clear)
-                } else {
-                    ForEach(approvedDevices) { device in
-                        deviceRow(device)
+                    } else {
+                        ForEach(approvedDevices) { device in
+                            deviceRow(device)
+                        }
                     }
+                } header: {
+                    Text("Your devices").fwbOnCanvas()
+                } footer: {
+                    Text("Each device has its own encryption keys. Revoking one stops it receiving anything new.")
+                        .fwbOnCanvas()
                 }
-            } header: {
-                Text("Your devices")
-            } footer: {
-                Text("Each device has its own encryption keys. Revoking one stops it receiving anything new.")
-            }
 
-            Section {
-                NavigationLink {
-                    NewPhoneGuideView()
-                } label: {
-                    Label("Setting up a new phone", systemImage: "iphone.gen3.badge.plus")
+                Section {
+                    NavigationLink {
+                        NewPhoneGuideView()
+                    } label: {
+                        Label("Setting up a new phone", systemImage: "iphone.gen3.badge.plus")
+                    }
+                    .accessibilityIdentifier("devices.newPhone")
                 }
-                .accessibilityIdentifier("devices.newPhone")
-            }
 
-            if let errorMessage {
-                Section { FormErrorText(message: errorMessage) }
+                if let errorMessage {
+                    Section { FormErrorText(message: errorMessage) }
+                }
             }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         .navigationTitle("Devices")
         .navigationBarTitleDisplayMode(.inline)
+        // A pushed destination is a sibling in its stack, not a child of the root
+        // the stack's surface was applied to, so it carries its own — inside
+        // whichever stack hosts it. See `fwbAppThemeSurface()`.
+        .fwbAppThemeSurface()
         .task { await refreshDevices() }
         .refreshable { await refreshDevices() }
         .confirmationDialog(
@@ -252,34 +266,43 @@ struct NewPhoneGuideView: View {
 
     var body: some View {
         Form {
-            Section {
-                Text("Your chat keys live only on this phone. They're deliberately excluded from iCloud, from encrypted backups, and from Quick Start — which is what stops anyone restoring a backup and reading your messages.")
-                    .font(Theme.Typography.body)
-            } header: {
-                Text("Why a new phone starts empty")
-            }
+            Group {
+                Section {
+                    Text("Your chat keys live only on this phone. They're deliberately excluded from iCloud, from encrypted backups, and from Quick Start — which is what stops anyone restoring a backup and reading your messages.")
+                        .font(Theme.Typography.body)
+                } header: {
+                    Text("Why a new phone starts empty").fwbOnCanvas()
+                }
 
-            Section {
-                step(1, "Set up the new phone and sign in to fwb social on it.")
-                step(2, "It'll appear here, on this phone, waiting for approval.")
-                step(3, "Approve it here. Your history transfers across — keep both phones on until it finishes.")
-                step(4, "Only then wipe or trade in this phone.")
-            } header: {
-                Text("The order matters")
-            } footer: {
-                Text("If you wipe this phone first, the new one still works — you'll just start with an empty history, and there's no way to recover it. Not by us, not by anyone.")
-            }
+                Section {
+                    step(1, "Set up the new phone and sign in to fwb social on it.")
+                    step(2, "It'll appear here, on this phone, waiting for approval.")
+                    step(3, "Approve it here. Your history transfers across — keep both phones on until it finishes.")
+                    step(4, "Only then wipe or trade in this phone.")
+                } header: {
+                    Text("The order matters").fwbOnCanvas()
+                } footer: {
+                    Text("If you wipe this phone first, the new one still works — you'll just start with an empty history, and there's no way to recover it. Not by us, not by anyone.")
+                        .fwbOnCanvas()
+                }
 
-            Section {
-                Text("If you lose every device, you can sign in again and set up a fresh one. Your account, friends and groups all come back. Your old messages don't.")
-                    .font(Theme.Typography.preview)
-                    .foregroundStyle(.secondary)
-            } header: {
-                Text("If you lose everything")
+                Section {
+                    Text("If you lose every device, you can sign in again and set up a fresh one. Your account, friends and groups all come back. Your old messages don't.")
+                        .font(Theme.Typography.preview)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("If you lose everything").fwbOnCanvas()
+                }
             }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         .navigationTitle("New phone")
         .navigationBarTitleDisplayMode(.inline)
+        // A pushed destination is a sibling in its stack, not a child of the root
+        // the stack's surface was applied to, so it carries its own — inside
+        // whichever stack hosts it. See `fwbAppThemeSurface()`.
+        .fwbAppThemeSurface()
     }
 
     private func step(_ number: Int, _ text: String) -> some View {

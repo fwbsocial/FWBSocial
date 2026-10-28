@@ -47,46 +47,54 @@ struct AnnouncementComposerView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Announcement") {
-                    TextField("Title", text: $title)
-                        .textInputAutocapitalization(.sentences)
-                    TextField("Body", text: $body_, axis: .vertical)
-                        .lineLimit(6...20)
-                        .textInputAutocapitalization(.sentences)
-                }
-
-                Section {
-                    Picker("Visibility", selection: $visibility) {
-                        Text("Everyone").tag("public")
-                        Text("Vetted members").tag("vetted")
-                    }
-                    Toggle("Pin to top", isOn: $isPinned)
-                } footer: {
-                    Text(visibility == "public"
-                         ? "Readable by anyone, including signed-out visitors."
-                         : "Only visible to members who've been vetted.")
-                }
-
-                if let errorMessage {
+                Group {
                     Section {
-                        Text(errorMessage).foregroundStyle(Theme.Colors.danger)
+                        TextField("Title", text: $title)
+                            .textInputAutocapitalization(.sentences)
+                        TextField("Body", text: $body_, axis: .vertical)
+                            .lineLimit(6...20)
+                            .textInputAutocapitalization(.sentences)
+                    } header: {
+                        Text("Announcement").fwbOnCanvas()
                     }
-                }
 
-                // Offered while the announcement is still a draft — which is
-                // every new one, and an existing one that has not gone out yet.
-                // Once it is published there is nothing left for this to do.
-                if canPublish {
                     Section {
-                        Toggle("Publish now", isOn: $publishNow)
-                            .accessibilityIdentifier("composer.publishNow")
-                            .accessibilityHint("Publishes on save and notifies members who have announcement notifications on")
+                        Picker("Visibility", selection: $visibility) {
+                            Text("Everyone").tag("public")
+                            Text("Vetted members").tag("vetted")
+                        }
+                        Toggle("Pin to top", isOn: $isPinned)
                     } footer: {
-                        Text(publishNow
-                             ? "Goes out as soon as you \(isEditing ? "save" : "create") it. Members with announcement notifications on will get a push — once, even if you edit and save again later."
-                             : "Off: saved as a draft. Only admins can see it, and nobody is notified until you publish.")
+                        Text(visibility == "public"
+                             ? "Readable by anyone, including signed-out visitors."
+                             : "Only visible to members who've been vetted.")
+                        .fwbOnCanvas()
+                    }
+
+                    if let errorMessage {
+                        Section {
+                            Text(errorMessage).foregroundStyle(Theme.Colors.danger)
+                        }
+                    }
+
+                    // Offered while the announcement is still a draft — which is
+                    // every new one, and an existing one that has not gone out yet.
+                    // Once it is published there is nothing left for this to do.
+                    if canPublish {
+                        Section {
+                            Toggle("Publish now", isOn: $publishNow)
+                                .accessibilityIdentifier("composer.publishNow")
+                                .accessibilityHint("Publishes on save and notifies members who have announcement notifications on")
+                        } footer: {
+                            Text(publishNow
+                                 ? "Goes out as soon as you \(isEditing ? "save" : "create") it. Members with announcement notifications on will get a push — once, even if you edit and save again later."
+                                 : "Off: saved as a draft. Only admins can see it, and nobody is notified until you publish.")
+                            .fwbOnCanvas()
+                        }
                     }
                 }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                .fwbThemedRows()
             }
             .navigationTitle(isEditing ? "Edit announcement" : "New announcement")
             .navigationBarTitleDisplayMode(.inline)
@@ -117,6 +125,8 @@ struct AnnouncementComposerView: View {
                     ProgressView().controlSize(.large)
                 }
             }
+            // Inside the stack — it does not cross a NavigationStack boundary.
+            .fwbAppThemeSurface()
         }
     }
 

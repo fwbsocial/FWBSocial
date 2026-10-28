@@ -62,6 +62,9 @@ struct AuthorProfileSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            // Inside the stack — it does not cross a NavigationStack boundary. The
+            // name and handle sit on the canvas; the buttons are containers.
+            .fwbAppThemeSurface()
             .fwbReportSheet($reportTarget)
             .confirmationDialog(
                 "Block \(author.name)?",

@@ -31,66 +31,77 @@ struct ReportQueueView: View {
 
     var body: some View {
         List {
-            if let queue {
+            Group {
+                if let queue {
+                    Section {
+                        summary(queue)
+                    }
+                }
+
+                if let loadError, !items.isEmpty {
+                    Section { InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } } }
+                }
+
                 Section {
-                    summary(queue)
+                    Picker("Show", selection: $statusFilter) {
+                        Text("Open").tag(String?.none)
+                        Text("Actioned").tag(String?.some("actioned"))
+                        Text("Dismissed").tag(String?.some("dismissed"))
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: statusFilter) { _, _ in
+                        Task { await load() }
+                    }
                 }
-            }
 
-            if let loadError, !items.isEmpty {
-                Section { InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } } }
-            }
-
-            Section {
-                Picker("Show", selection: $statusFilter) {
-                    Text("Open").tag(String?.none)
-                    Text("Actioned").tag(String?.some("actioned"))
-                    Text("Dismissed").tag(String?.some("dismissed"))
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: statusFilter) { _, _ in
-                    Task { await load() }
-                }
-            }
-
-            // **The most important `error == nil` in the app.** This is the
-            // Guideline 1.2 "act within 24 h" surface. Without the guard, a queue
-            // that 500'd told the on-call moderator "No open reports. That is the
-            // good outcome." — a false all-clear on the one screen where a false
-            // all-clear has a victim.
-            if items.isEmpty && !isLoading {
-                Section {
-                    if let loadError {
-                        ErrorStateView(error: loadError) { Task { await load() } }
+                // **The most important `error == nil` in the app.** This is the
+                // Guideline 1.2 "act within 24 h" surface. Without the guard, a queue
+                // that 500'd told the on-call moderator "No open reports. That is the
+                // good outcome." — a false all-clear on the one screen where a false
+                // all-clear has a victim.
+                if items.isEmpty && !isLoading {
+                    Section {
+                        if let loadError {
+                            ErrorStateView(error: loadError) { Task { await load() } }
+                                // A clear row sits on the canvas, not in a box.
+                                .fwbOnCanvas()
+                                .listRowBackground(Color.clear)
+                        } else {
+                            EmptyStateView(
+                                icon: "checkmark.shield",
+                                title: "Nothing waiting",
+                                message: statusFilter == nil
+                                    ? "No open reports. That is the good outcome."
+                                    : "No reports with that status.")
+                            .fwbOnCanvas()
                             .listRowBackground(Color.clear)
-                    } else {
-                        EmptyStateView(
-                            icon: "checkmark.shield",
-                            title: "Nothing waiting",
-                            message: statusFilter == nil
-                                ? "No open reports. That is the good outcome."
-                                : "No reports with that status.")
-                        .listRowBackground(Color.clear)
+                        }
+                    }
+                }
+
+                ForEach(items) { report in
+                    ReportRow(report: report) {
+                        resolving = report
+                    } assign: {
+                        assign(report)
+                    }
+                }
+
+                if isLoading {
+                    Section {
+                        HStack { Spacer(); ProgressView(); Spacer() }
                     }
                 }
             }
-
-            ForEach(items) { report in
-                ReportRow(report: report) {
-                    resolving = report
-                } assign: {
-                    assign(report)
-                }
-            }
-
-            if isLoading {
-                Section {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                }
-            }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         .navigationTitle("Reports")
         .navigationBarTitleDisplayMode(.inline)
+        // A pushed destination is a sibling in its stack, not a child of the root
+        // the stack's surface was applied to, so it carries its own — inside
+        // whichever stack hosts it. See `fwbAppThemeSurface()`.
+        .fwbAppThemeSurface()
         .task { await load() }
         .refreshable { await load() }
         .sheet(item: $resolving) { report in
@@ -269,39 +280,46 @@ private struct ResolveReportSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Outcome") {
-                    Picker("Outcome", selection: $outcome) {
-                        ForEach(ModerationOutcome.allCases) { option in
-                            Text(option.label).tag(option)
+                Group {
+                    Section {
+                        Picker("Outcome", selection: $outcome) {
+                            ForEach(ModerationOutcome.allCases) { option in
+                                Text(option.label).tag(option)
+                            }
+                        }
+                        .pickerStyle(.inline)
+                        .labelsHidden()
+                    } header: {
+                        Text("Outcome").fwbOnCanvas()
+                    }
+
+                    Section {
+                        TextField("Note for the audit log", text: $note, axis: .vertical)
+                            .lineLimit(2...5)
+                    } footer: {
+                        // The moderation log is immutable server-side (§2.6, Q20).
+                        Text("Recorded in the moderation log, which cannot be edited later.")
+                            .fwbOnCanvas()
+                    }
+
+                    if outcome == .banned || outcome == .vettingRevoked {
+                        Section {
+                            Label(
+                                outcome == .banned
+                                    ? "Banning is an admin action with a required content decision — do it from the member's profile, not here."
+                                    : "Revoking vetting removes forum and chat access until an admin restores it.",
+                                systemImage: "exclamationmark.triangle")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(Theme.Colors.caution)
                         }
                     }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                }
 
-                Section {
-                    TextField("Note for the audit log", text: $note, axis: .vertical)
-                        .lineLimit(2...5)
-                } footer: {
-                    // The moderation log is immutable server-side (§2.6, Q20).
-                    Text("Recorded in the moderation log, which cannot be edited later.")
-                }
-
-                if outcome == .banned || outcome == .vettingRevoked {
-                    Section {
-                        Label(
-                            outcome == .banned
-                                ? "Banning is an admin action with a required content decision — do it from the member's profile, not here."
-                                : "Revoking vetting removes forum and chat access until an admin restores it.",
-                            systemImage: "exclamationmark.triangle")
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(Theme.Colors.caution)
+                    if let error {
+                        Section { FormErrorText(message: error) }
                     }
                 }
-
-                if let error {
-                    Section { FormErrorText(message: error) }
-                }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                .fwbThemedRows()
             }
             .fwbDismissKeyboardOnTap()
             .navigationTitle("Resolve")
@@ -314,6 +332,8 @@ private struct ResolveReportSheet: View {
                     Button("Save") { save() }.disabled(isSaving)
                 }
             }
+            // Inside the stack — it does not cross a NavigationStack boundary.
+            .fwbAppThemeSurface()
         }
     }
 

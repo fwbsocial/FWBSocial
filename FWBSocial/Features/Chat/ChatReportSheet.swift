@@ -55,60 +55,66 @@ struct ChatReportSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Picker("Reason", selection: $reason) {
-                        ForEach(ReportReason.allCases) { option in
-                            Label(option.label, systemImage: option.systemImage).tag(option)
-                        }
-                    }
-                    TextField("Anything else we should know? (optional)", text: $details, axis: .vertical)
-                        .lineLimit(2 ... 5)
-                } header: {
-                    Text("Why are you reporting this?")
-                }
-
-                Section {
-                    Stepper("Include \(contextCount) message\(contextCount == 1 ? "" : "s") either side", value: $contextCount, in: 0 ... 10)
-                } header: {
-                    Text("Context")
-                } footer: {
-                    Text("Context helps a moderator understand what happened. Everything you include is sent.")
-                }
-
-                Section {
-                    ForEach(bundleMessages) { entry in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: Theme.Spacing.xs) {
-                                Text(chat.isMine(entry) ? "You" : chat.name(for: entry.senderId))
-                                    .font(Theme.Typography.caption.weight(.semibold))
-                                Text(entry.createdAt, format: .dateTime.hour().minute())
-                                    .font(Theme.Typography.micro)
-                                    .foregroundStyle(.tertiary)
-                                if entry.id == message.id {
-                                    StatusBadge("Reported", color: Theme.Colors.danger)
-                                }
+                Group {
+                    Section {
+                        Picker("Reason", selection: $reason) {
+                            ForEach(ReportReason.allCases) { option in
+                                Label(option.label, systemImage: option.systemImage).tag(option)
                             }
-                            Text(entry.decryptedText ?? "")
-                                .font(Theme.Typography.preview)
                         }
-                        .padding(.vertical, 2)
-                        // One stop per message, not four. Left alone, VoiceOver walked
-                        // the sender, the timestamp, the "Reported" badge and the body
-                        // as separate elements, so auditing the bundle — the entire
-                        // reason this preview exists — took four swipes per message and
-                        // scattered the badge away from the message it marks.
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(evidenceLabel(for: entry))
+                        TextField("Anything else we should know? (optional)", text: $details, axis: .vertical)
+                            .lineLimit(2 ... 5)
+                    } header: {
+                        Text("Why are you reporting this?").fwbOnCanvas()
                     }
-                } header: {
-                    Text("Exactly what will be sent")
-                } footer: {
-                    Text("This is the only way a moderator can see a private message — we can't read them ourselves. It's stored encrypted, kept for one year, and only seen by whoever handles this report.")
-                }
 
-                if let errorMessage {
-                    Section { FormErrorText(message: errorMessage) }
+                    Section {
+                        Stepper("Include \(contextCount) message\(contextCount == 1 ? "" : "s") either side", value: $contextCount, in: 0 ... 10)
+                    } header: {
+                        Text("Context").fwbOnCanvas()
+                    } footer: {
+                        Text("Context helps a moderator understand what happened. Everything you include is sent.")
+                            .fwbOnCanvas()
+                    }
+
+                    Section {
+                        ForEach(bundleMessages) { entry in
+                            VStack(alignment: .leading, spacing: 3) {
+                                HStack(spacing: Theme.Spacing.xs) {
+                                    Text(chat.isMine(entry) ? "You" : chat.name(for: entry.senderId))
+                                        .font(Theme.Typography.caption.weight(.semibold))
+                                    Text(entry.createdAt, format: .dateTime.hour().minute())
+                                        .font(Theme.Typography.micro)
+                                        .foregroundStyle(.tertiary)
+                                    if entry.id == message.id {
+                                        StatusBadge("Reported", color: Theme.Colors.danger)
+                                    }
+                                }
+                                Text(entry.decryptedText ?? "")
+                                    .font(Theme.Typography.preview)
+                            }
+                            .padding(.vertical, 2)
+                            // One stop per message, not four. Left alone, VoiceOver walked
+                            // the sender, the timestamp, the "Reported" badge and the body
+                            // as separate elements, so auditing the bundle — the entire
+                            // reason this preview exists — took four swipes per message and
+                            // scattered the badge away from the message it marks.
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(evidenceLabel(for: entry))
+                        }
+                    } header: {
+                        Text("Exactly what will be sent").fwbOnCanvas()
+                    } footer: {
+                        Text("This is the only way a moderator can see a private message — we can't read them ourselves. It's stored encrypted, kept for one year, and only seen by whoever handles this report.")
+                            .fwbOnCanvas()
+                    }
+
+                    if let errorMessage {
+                        Section { FormErrorText(message: errorMessage) }
+                    }
                 }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                .fwbThemedRows()
             }
             // Background layer, never `.onTapGesture` on the Form itself — that
             // kills every row control in it (house rule).
@@ -136,6 +142,8 @@ struct ChatReportSheet: View {
             } message: {
                 Text("A moderator will look at this within 24 hours. You can also block this person from their profile.")
             }
+            // Inside the stack — it does not cross a NavigationStack boundary.
+            .fwbAppThemeSurface()
         }
     }
 

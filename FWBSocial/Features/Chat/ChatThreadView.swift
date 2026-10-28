@@ -40,7 +40,12 @@ struct ChatThreadView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
+                    // A pushed destination is a sibling in the stack, so it needs
+                    // the theme's surface of its own. Applied here rather than
+                    // inside the screen because its other route, the slot's
+                    // `DismissableSheet`, already supplies one.
                     ConversationSettingsView(conversationId: conversationId)
+                        .fwbAppThemeSurface()
                 } label: {
                     Label("Details", systemImage: "info.circle")
                 }

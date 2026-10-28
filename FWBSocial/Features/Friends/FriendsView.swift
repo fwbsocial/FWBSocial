@@ -29,95 +29,107 @@ struct FriendsView: View {
 
     var body: some View {
         Form {
-            // The entry flow itself lives in `AddFriendByCode.swift` — the Events
-            // tab and the event roster present the same thing as a sheet, and a
-            // lookup whose defining property is that all its failures look alike
-            // must not exist in three copies.
-            AddFriendByCodeSection { Task { await load() } }
+            Group {
+                // The entry flow itself lives in `AddFriendByCode.swift` — the Events
+                // tab and the event roster present the same thing as a sheet, and a
+                // lookup whose defining property is that all its failures look alike
+                // must not exist in three copies.
+                AddFriendByCodeSection { Task { await load() } }
 
-            if !requests.isEmpty {
-                Section("Requests") {
-                    ForEach(requests) { request in
-                        // Both button styles apply `.frame(maxWidth: .infinity)`, so
-                        // two of them side by side already fill the row at default
-                        // sizes and overflow it outright at accessibility sizes.
-                        // `ViewThatFits` keeps the one-line arrangement while it
-                        // fits and stacks the pair underneath the name when it
-                        // cannot.
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: Theme.Spacing.md) {
-                                requestIdentity(request)
-                                Spacer()
-                                requestActions(request)
-                            }
-                            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                if !requests.isEmpty {
+                    Section {
+                        ForEach(requests) { request in
+                            // Both button styles apply `.frame(maxWidth: .infinity)`, so
+                            // two of them side by side already fill the row at default
+                            // sizes and overflow it outright at accessibility sizes.
+                            // `ViewThatFits` keeps the one-line arrangement while it
+                            // fits and stacks the pair underneath the name when it
+                            // cannot.
+                            ViewThatFits(in: .horizontal) {
                                 HStack(spacing: Theme.Spacing.md) {
                                     requestIdentity(request)
                                     Spacer()
+                                    requestActions(request)
                                 }
-                                requestActions(request)
-                            }
-                        }
-                        .disabled(isWorking)
-                    }
-                }
-            }
-
-            Section {
-                if isLoading {
-                    ProgressView()
-                } else if let loadError {
-                    // Ahead of the empty state: "No friends yet" is a claim about
-                    // this member's social graph, and a failed fetch does not
-                    // entitle the app to make it.
-                    ErrorStateView(error: loadError) { Task { await load() } }
-                        .listRowBackground(Color.clear)
-                } else if friends.isEmpty {
-                    Text("No friends yet. Add someone with their code, or meet people through an event's friending window.")
-                        .font(Theme.Typography.preview)
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(friends) { friend in
-                        HStack(spacing: Theme.Spacing.md) {
-                            AvatarView(name: friend.displayName, url: friend.avatarUrl)
-                                .frame(width: 36, height: 36)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(friend.displayName).font(Theme.Typography.rowTitle)
-                                if let since = friend.friendsSince {
-                                    Text("Friends since \(since, format: .dateTime.month().year())")
-                                        .font(Theme.Typography.micro)
-                                        .foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                                    HStack(spacing: Theme.Spacing.md) {
+                                        requestIdentity(request)
+                                        Spacer()
+                                    }
+                                    requestActions(request)
                                 }
                             }
-                            Spacer()
-                            Button {
-                                Task { await message(friend) }
-                            } label: {
-                                Image(systemName: "bubble.left.and.text.bubble.right")
-                            }
-                            .accessibilityIdentifier("friends.message.\(friend.userId.uuidString)")
-                            // The name has to be in the label: every row's button
-                            // is otherwise the same unlabelled glyph, so VoiceOver
-                            // gave no way to tell whom you were about to message.
-                            .accessibilityLabel("Message \(friend.displayName)")
+                            .disabled(isWorking)
                         }
-                        .swipeActions {
-                            Button("Remove", role: .destructive) { Task { await unfriend(friend) } }
-                        }
+                    } header: {
+                        Text("Requests").fwbOnCanvas()
                     }
                 }
-            } header: {
-                Text("Friends")
-            }
 
-            // "Request sent." now belongs to the shared section that sent it; what
-            // is left here reports the actions this screen still owns — accept,
-            // decline, unfriend, start a conversation.
-            if let errorMessage {
-                Section { FormErrorText(message: errorMessage) }
+                Section {
+                    if isLoading {
+                        ProgressView()
+                    } else if let loadError {
+                        // Ahead of the empty state: "No friends yet" is a claim about
+                        // this member's social graph, and a failed fetch does not
+                        // entitle the app to make it.
+                        ErrorStateView(error: loadError) { Task { await load() } }
+                            // A clear row sits on the canvas, not in a box.
+                            .fwbOnCanvas()
+                            .listRowBackground(Color.clear)
+                    } else if friends.isEmpty {
+                        Text("No friends yet. Add someone with their code, or meet people through an event's friending window.")
+                            .font(Theme.Typography.preview)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(friends) { friend in
+                            HStack(spacing: Theme.Spacing.md) {
+                                AvatarView(name: friend.displayName, url: friend.avatarUrl)
+                                    .frame(width: 36, height: 36)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(friend.displayName).font(Theme.Typography.rowTitle)
+                                    if let since = friend.friendsSince {
+                                        Text("Friends since \(since, format: .dateTime.month().year())")
+                                            .font(Theme.Typography.micro)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                Spacer()
+                                Button {
+                                    Task { await message(friend) }
+                                } label: {
+                                    Image(systemName: "bubble.left.and.text.bubble.right")
+                                }
+                                .accessibilityIdentifier("friends.message.\(friend.userId.uuidString)")
+                                // The name has to be in the label: every row's button
+                                // is otherwise the same unlabelled glyph, so VoiceOver
+                                // gave no way to tell whom you were about to message.
+                                .accessibilityLabel("Message \(friend.displayName)")
+                            }
+                            .swipeActions {
+                                Button("Remove", role: .destructive) { Task { await unfriend(friend) } }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Friends").fwbOnCanvas()
+                }
+
+                // "Request sent." now belongs to the shared section that sent it; what
+                // is left here reports the actions this screen still owns — accept,
+                // decline, unfriend, start a conversation.
+                if let errorMessage {
+                    Section { FormErrorText(message: errorMessage) }
+                }
             }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         .navigationTitle("Friends")
+        // A pushed destination is a sibling in its stack, not a child of the root
+        // the stack's surface was applied to, so it carries its own — inside
+        // whichever stack hosts it. See `fwbAppThemeSurface()`.
+        .fwbAppThemeSurface()
         .task { await load() }
         .refreshable { await load() }
     }

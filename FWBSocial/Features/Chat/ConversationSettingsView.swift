@@ -33,108 +33,127 @@ struct ConversationSettingsView: View {
 
     var body: some View {
         Form {
-            if let conversation {
-                if conversation.isGroup {
-                    Section("Name") {
-                        TextField("Group name", text: $titleDraft)
-                            .onSubmit { Task { await saveTitle() } }
-                    }
-                }
-
-                Section {
-                    LabeledContent("Protection") {
-                        Text(conversation.requireQuantum ? "Quantum-secure" : "Standard")
-                    }
-                    NavigationLink {
-                        SafetyNumberView(conversationId: conversationId)
-                    } label: {
-                        Label("Safety number", systemImage: "number.square")
-                    }
-                    .accessibilityIdentifier("chat.safetyNumber")
-                } header: {
-                    Text("Encryption")
-                } footer: {
-                    Text("Compare the safety number with the other person — out loud, or side by side — to be certain no one is in the middle. It changes when someone adds or replaces a device.")
-                }
-
-                Section {
-                    Picker("Delete messages after", selection: $ttl) {
-                        ForEach(MessageTTL.allCases) { option in
-                            Text(option.label).tag(option)
+            Group {
+                if let conversation {
+                    if conversation.isGroup {
+                        Section {
+                            TextField("Group name", text: $titleDraft)
+                                .onSubmit { Task { await saveTitle() } }
+                        } header: {
+                            Text("Name").fwbOnCanvas()
                         }
                     }
-                    .onChange(of: ttl) { _, newValue in
-                        // Only write when the picker has actually moved away from the
-                        // server's value. That skips two writes nobody asked for: the
-                        // one `.task` used to trigger just by seeding the picker, and
-                        // the one a revert below would otherwise trigger on its way
-                        // back.
-                        guard newValue != serverTTL else { return }
-                        Task { await saveTTL(newValue) }
+
+                    Section {
+                        LabeledContent("Protection") {
+                            Text(conversation.requireQuantum ? "Quantum-secure" : "Standard")
+                        }
+                        NavigationLink {
+                            SafetyNumberView(conversationId: conversationId)
+                        } label: {
+                            Label("Safety number", systemImage: "number.square")
+                        }
+                        .accessibilityIdentifier("chat.safetyNumber")
+                    } header: {
+                        Text("Encryption").fwbOnCanvas()
+                    } footer: {
+                        Text("Compare the safety number with the other person — out loud, or side by side — to be certain no one is in the middle. It changes when someone adds or replaces a device.")
+                            .fwbOnCanvas()
                     }
-                } header: {
-                    Text("Message history")
-                } footer: {
-                    Text("Applies to everyone in this conversation, on the server and on each device. Turning it off keeps messages until someone deletes them.")
-                }
 
-                Section("Notifications") {
-                    Toggle("Mute this conversation", isOn: Binding(
-                        get: { conversation.muted },
-                        set: { newValue in Task { await chat.setMuted(newValue, conversationId: conversationId) } }
-                    ))
-                }
-
-                Section("People") {
-                    ForEach(conversation.memberIds, id: \.self) { memberId in
-                        HStack(spacing: Theme.Spacing.md) {
-                            AvatarView(name: chat.name(for: memberId), url: nil)
-                                .frame(width: 32, height: 32)
-                            Text(chat.name(for: memberId))
-                            Spacer()
-                            if memberId == conversation.createdBy {
-                                StatusBadge("Created it")
+                    Section {
+                        Picker("Delete messages after", selection: $ttl) {
+                            ForEach(MessageTTL.allCases) { option in
+                                Text(option.label).tag(option)
                             }
                         }
+                        .onChange(of: ttl) { _, newValue in
+                            // Only write when the picker has actually moved away from the
+                            // server's value. That skips two writes nobody asked for: the
+                            // one `.task` used to trigger just by seeding the picker, and
+                            // the one a revert below would otherwise trigger on its way
+                            // back.
+                            guard newValue != serverTTL else { return }
+                            Task { await saveTTL(newValue) }
+                        }
+                    } header: {
+                        Text("Message history").fwbOnCanvas()
+                    } footer: {
+                        Text("Applies to everyone in this conversation, on the server and on each device. Turning it off keeps messages until someone deletes them.")
+                            .fwbOnCanvas()
                     }
-                }
 
-                Section {
-                    Button(conversation.isGroup ? "Leave conversation" : "Delete conversation", role: .destructive) {
-                        isConfirmingLeave = true
+                    Section {
+                        Toggle("Mute this conversation", isOn: Binding(
+                            get: { conversation.muted },
+                            set: { newValue in Task { await chat.setMuted(newValue, conversationId: conversationId) } }
+                        ))
+                    } header: {
+                        Text("Notifications").fwbOnCanvas()
                     }
-                    .accessibilityIdentifier("chat.leave")
-                } footer: {
-                    Text("You'll stop receiving messages. Messages already on other people's devices stay there — we can't reach them.")
-                }
 
-                if let errorMessage {
-                    Section { FormErrorText(message: errorMessage) }
-                }
-            } else if chat.isLoadingConversations {
-                Section {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                }
-            } else if let conversationsError = chat.conversationsError {
-                // Same order as everywhere else — loading, then error, then the
-                // "we looked and it isn't there" state below. Without this branch the
-                // whole Form rendered as a blank screen under a "Details" title, which
-                // reads as a broken app rather than as a failed fetch.
-                Section {
-                    ErrorStateView(error: conversationsError) {
-                        Task { await chat.refreshConversations() }
+                    Section {
+                        ForEach(conversation.memberIds, id: \.self) { memberId in
+                            HStack(spacing: Theme.Spacing.md) {
+                                AvatarView(name: chat.name(for: memberId), url: nil)
+                                    .frame(width: 32, height: 32)
+                                Text(chat.name(for: memberId))
+                                Spacer()
+                                if memberId == conversation.createdBy {
+                                    StatusBadge("Created it")
+                                }
+                            }
+                        }
+                    } header: {
+                        Text("People").fwbOnCanvas()
                     }
-                    .listRowBackground(Color.clear)
-                }
-            } else {
-                Section {
-                    EmptyStateView(
-                        icon: "bubble.left.and.exclamationmark.bubble.right",
-                        title: "Conversation unavailable",
-                        message: "We can't find this conversation any more. It may have been deleted, or you may have left it on another device.")
-                    .listRowBackground(Color.clear)
+
+                    Section {
+                        Button(conversation.isGroup ? "Leave conversation" : "Delete conversation", role: .destructive) {
+                            isConfirmingLeave = true
+                        }
+                        .accessibilityIdentifier("chat.leave")
+                    } footer: {
+                        Text("You'll stop receiving messages. Messages already on other people's devices stay there — we can't reach them.")
+                            .fwbOnCanvas()
+                    }
+
+                    if let errorMessage {
+                        Section { FormErrorText(message: errorMessage) }
+                    }
+                } else if chat.isLoadingConversations {
+                    Section {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    }
+                } else if let conversationsError = chat.conversationsError {
+                    // Same order as everywhere else — loading, then error, then the
+                    // "we looked and it isn't there" state below. Without this branch the
+                    // whole Form rendered as a blank screen under a "Details" title, which
+                    // reads as a broken app rather than as a failed fetch.
+                    Section {
+                        ErrorStateView(error: conversationsError) {
+                            Task { await chat.refreshConversations() }
+                        }
+                        // A clear row sits on the canvas, not in a box.
+                        .fwbOnCanvas()
+                        .listRowBackground(Color.clear)
+                    }
+                } else {
+                    Section {
+                        EmptyStateView(
+                            icon: "bubble.left.and.exclamationmark.bubble.right",
+                            title: "Conversation unavailable",
+                            message: "We can't find this conversation any more. It may have been deleted, or you may have left it on another device.")
+                        .fwbOnCanvas()
+                        .listRowBackground(Color.clear)
+                    }
                 }
             }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`. The
+            // surface itself is applied by whoever presents this screen:
+            // `DismissableSheet` for the slot's sheet, the toolbar link's push site
+            // in `ChatThreadView` — applying it here too would paint it twice.
+            .fwbThemedRows()
         }
         .navigationTitle("Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -217,73 +236,83 @@ struct SafetyNumberView: View {
 
     var body: some View {
         Form {
-            Section {
-                if isLoading {
-                    ProgressView()
-                } else if let number {
-                    Text(number)
-                        .font(.system(.title3, design: .monospaced))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Theme.Spacing.md)
-                        .textSelection(.enabled)
-                        .accessibilityIdentifier("chat.safetyNumber.digits")
-                } else {
-                    Text("Not available yet — no verified devices in this conversation.")
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("Safety number")
-            } footer: {
-                Text("Covers \(deviceCount) device\(deviceCount == 1 ? "" : "s"). Both of you should see the same 30 digits.")
-            }
-
-            if let number {
+            Group {
                 Section {
-                    Toggle("I've verified this", isOn: Binding(
-                        get: { isVerified },
-                        set: { newValue in
-                            isVerified = newValue
-                            Task {
-                                await chat.setSafetyNumberVerified(
-                                    newValue, conversationId: conversationId, safetyNumber: number
-                                )
-                            }
-                        }
-                    ))
-                    .accessibilityIdentifier("chat.safetyNumber.verified")
-                } footer: {
-                    // The mark is stored against the EXACT number, so it un-verifies
-                    // itself when the device set changes. A "verified" badge that
-                    // survived a new device would be a lie.
-                    Text("If anyone adds or replaces a device, this number changes and you'll be asked to check it again.")
-                }
-            }
-
-            if let changed = chat.pendingKeyChanges[conversationId], !changed.isEmpty {
-                Section {
-                    ForEach(changed) { device in
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            Text(device.deviceName).font(Theme.Typography.rowTitle)
-                            Text("This device's keys changed since you last saw it. Messages aren't being sent to it.")
-                                .font(Theme.Typography.caption)
-                                .foregroundStyle(.secondary)
-                            Button("I've checked — trust it again") {
-                                Task {
-                                    await chat.acceptKeyChange(device, conversationId: conversationId)
-                                    await load()
-                                }
-                            }
-                            .font(Theme.Typography.caption.weight(.semibold))
-                        }
-                        .padding(.vertical, Theme.Spacing.xs)
+                    if isLoading {
+                        ProgressView()
+                    } else if let number {
+                        Text(number)
+                            .font(.system(.title3, design: .monospaced))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Theme.Spacing.md)
+                            .textSelection(.enabled)
+                            .accessibilityIdentifier("chat.safetyNumber.digits")
+                    } else {
+                        Text("Not available yet — no verified devices in this conversation.")
+                            .foregroundStyle(.secondary)
                     }
                 } header: {
-                    Text("Changed devices")
+                    Text("Safety number").fwbOnCanvas()
+                } footer: {
+                    Text("Covers \(deviceCount) device\(deviceCount == 1 ? "" : "s"). Both of you should see the same 30 digits.")
+                        .fwbOnCanvas()
+                }
+
+                if let number {
+                    Section {
+                        Toggle("I've verified this", isOn: Binding(
+                            get: { isVerified },
+                            set: { newValue in
+                                isVerified = newValue
+                                Task {
+                                    await chat.setSafetyNumberVerified(
+                                        newValue, conversationId: conversationId, safetyNumber: number
+                                    )
+                                }
+                            }
+                        ))
+                        .accessibilityIdentifier("chat.safetyNumber.verified")
+                    } footer: {
+                        // The mark is stored against the EXACT number, so it un-verifies
+                        // itself when the device set changes. A "verified" badge that
+                        // survived a new device would be a lie.
+                        Text("If anyone adds or replaces a device, this number changes and you'll be asked to check it again.")
+                            .fwbOnCanvas()
+                    }
+                }
+
+                if let changed = chat.pendingKeyChanges[conversationId], !changed.isEmpty {
+                    Section {
+                        ForEach(changed) { device in
+                            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                                Text(device.deviceName).font(Theme.Typography.rowTitle)
+                                Text("This device's keys changed since you last saw it. Messages aren't being sent to it.")
+                                    .font(Theme.Typography.caption)
+                                    .foregroundStyle(.secondary)
+                                Button("I've checked — trust it again") {
+                                    Task {
+                                        await chat.acceptKeyChange(device, conversationId: conversationId)
+                                        await load()
+                                    }
+                                }
+                                .font(Theme.Typography.caption.weight(.semibold))
+                            }
+                            .padding(.vertical, Theme.Spacing.xs)
+                        }
+                    } header: {
+                        Text("Changed devices").fwbOnCanvas()
+                    }
                 }
             }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         .navigationTitle("Safety number")
         .navigationBarTitleDisplayMode(.inline)
+        // A pushed destination is a sibling in its stack, not a child of the root
+        // the stack's surface was applied to, so it carries its own — inside
+        // whichever stack hosts it. See `fwbAppThemeSurface()`.
+        .fwbAppThemeSurface()
         .task { await load() }
     }
 

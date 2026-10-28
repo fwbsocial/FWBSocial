@@ -33,50 +33,57 @@ struct NewConversationView: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle("Group conversation", isOn: $isGroup.animation())
-                if isGroup {
-                    TextField("Group name (optional)", text: $groupTitle)
-                }
-            }
-
-            Section {
-                if isLoading {
-                    ProgressView()
-                } else if let loadError {
-                    // loading → error → empty → content. "No friends yet" is a claim
-                    // about the server's answer, and a request that failed is not an
-                    // answer: the member was being told they have no friends and
-                    // pointed at the friend-code flow because a fetch timed out.
-                    ErrorStateView(error: loadError) { Task { await load() } }
-                        .listRowBackground(Color.clear)
-                } else if friends.isEmpty {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-                        Text("No friends yet")
-                            .font(Theme.Typography.rowTitle)
-                        Text("Add someone with their friend code, or meet people at an event — the attendee list opens for 48 hours after it ends.")
-                            .font(Theme.Typography.caption)
-                            .foregroundStyle(.secondary)
-                        NavigationLink("Add a friend") { FriendsView() }
-                            .font(Theme.Typography.caption.weight(.semibold))
-                    }
-                    .padding(.vertical, Theme.Spacing.xs)
-                } else {
-                    ForEach(friends) { friend in
-                        friendRow(friend)
+            Group {
+                Section {
+                    Toggle("Group conversation", isOn: $isGroup.animation())
+                    if isGroup {
+                        TextField("Group name (optional)", text: $groupTitle)
                     }
                 }
-            } header: {
-                Text(isGroup ? "Who's in it?" : "Who do you want to message?")
-            } footer: {
-                if !unreachable.isEmpty {
-                    Text("Some people can't be added right now. That can mean their inbox is set to friends only, or they aren't available to you.")
+
+                Section {
+                    if isLoading {
+                        ProgressView()
+                    } else if let loadError {
+                        // loading → error → empty → content. "No friends yet" is a claim
+                        // about the server's answer, and a request that failed is not an
+                        // answer: the member was being told they have no friends and
+                        // pointed at the friend-code flow because a fetch timed out.
+                        ErrorStateView(error: loadError) { Task { await load() } }
+                            // A clear row sits on the canvas, not in a box.
+                            .fwbOnCanvas()
+                            .listRowBackground(Color.clear)
+                    } else if friends.isEmpty {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                            Text("No friends yet")
+                                .font(Theme.Typography.rowTitle)
+                            Text("Add someone with their friend code, or meet people at an event — the attendee list opens for 48 hours after it ends.")
+                                .font(Theme.Typography.caption)
+                                .foregroundStyle(.secondary)
+                            NavigationLink("Add a friend") { FriendsView() }
+                                .font(Theme.Typography.caption.weight(.semibold))
+                        }
+                        .padding(.vertical, Theme.Spacing.xs)
+                    } else {
+                        ForEach(friends) { friend in
+                            friendRow(friend)
+                        }
+                    }
+                } header: {
+                    Text(isGroup ? "Who's in it?" : "Who do you want to message?").fwbOnCanvas()
+                } footer: {
+                    if !unreachable.isEmpty {
+                        Text("Some people can't be added right now. That can mean their inbox is set to friends only, or they aren't available to you.")
+                            .fwbOnCanvas()
+                    }
+                }
+
+                if let errorMessage {
+                    Section { FormErrorText(message: errorMessage) }
                 }
             }
-
-            if let errorMessage {
-                Section { FormErrorText(message: errorMessage) }
-            }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         .navigationTitle("New conversation")
         .navigationBarTitleDisplayMode(.inline)
@@ -90,6 +97,8 @@ struct NewConversationView: View {
                     .accessibilityIdentifier("chat.new.start")
             }
         }
+        // Inside the sheet's NavigationStack (ChatListView supplies it).
+        .fwbAppThemeSurface()
         .task { await load() }
     }
 

@@ -90,9 +90,12 @@ struct AddFriendByCodeSection: View {
                 FormErrorText(message: errorMessage)
             }
         } header: {
-            Text("Add by friend code")
+            // On the canvas, not in a row: `FriendsView` wraps this section in
+            // `fwbThemedRows()`, which would otherwise hand it the row appearance.
+            Text("Add by friend code").fwbOnCanvas()
         } footer: {
             Text("Your own code is on your profile. Codes are exact — there's no search, on purpose.")
+                .fwbOnCanvas()
         }
     }
 

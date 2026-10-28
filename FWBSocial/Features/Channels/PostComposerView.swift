@@ -67,40 +67,47 @@ struct PostComposerView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    TextField("Title", text: $title)
-                        .accessibilityIdentifier("composer.title")
-                        .focused($focus, equals: .title)
-                        .submitLabel(.next)
-                        .onSubmit { focus = .body }
-                } footer: {
-                    if title.count > maxTitle {
-                        Text("\(title.count) / \(maxTitle)")
-                            .foregroundStyle(Theme.Colors.danger)
+                Group {
+                    Section {
+                        TextField("Title", text: $title)
+                            .accessibilityIdentifier("composer.title")
+                            .focused($focus, equals: .title)
+                            .submitLabel(.next)
+                            .onSubmit { focus = .body }
+                    } footer: {
+                        if title.count > maxTitle {
+                            Text("\(title.count) / \(maxTitle)")
+                                .foregroundStyle(Theme.Colors.danger)
+                                .fwbOnCanvas()
+                        }
+                    }
+
+                    Section {
+                        TextField("What's on your mind?", text: $body_, axis: .vertical)
+                            .accessibilityIdentifier("composer.body")
+                            .lineLimit(8...20)
+                            .focused($focus, equals: .body)
+                    } header: {
+                        Text("Post").fwbOnCanvas()
+                    } footer: {
+                        if body_.count > maxBody {
+                            Text("\(body_.count) / \(maxBody)")
+                                .foregroundStyle(Theme.Colors.danger)
+                                .fwbOnCanvas()
+                        } else {
+                            Text("Posting to \(channel.displayName). Everyone vetted can read this.")
+                                .fwbOnCanvas()
+                        }
+                    }
+
+                    mediaSection
+
+                    if let error {
+                        Section { FormErrorText(message: error) }
                     }
                 }
-
-                Section {
-                    TextField("What's on your mind?", text: $body_, axis: .vertical)
-                        .accessibilityIdentifier("composer.body")
-                        .lineLimit(8...20)
-                        .focused($focus, equals: .body)
-                } header: {
-                    Text("Post")
-                } footer: {
-                    if body_.count > maxBody {
-                        Text("\(body_.count) / \(maxBody)")
-                            .foregroundStyle(Theme.Colors.danger)
-                    } else {
-                        Text("Posting to \(channel.displayName). Everyone vetted can read this.")
-                    }
-                }
-
-                mediaSection
-
-                if let error {
-                    Section { FormErrorText(message: error) }
-                }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                .fwbThemedRows()
             }
             // Background layer, never on the Form itself.
             .fwbDismissKeyboardOnTap()
@@ -128,6 +135,9 @@ struct PostComposerView: View {
                     }
                 }
             }
+            // Inside the stack — it does not cross a NavigationStack boundary — and
+            // after the overlay, so the upload caption sits on the canvas too.
+            .fwbAppThemeSurface()
             .onChange(of: photoItems) { _, items in
                 guard !items.isEmpty else { photoPreviews = []; return }
                 videoItem = nil; videoPreview = nil; videoDuration = nil
@@ -265,9 +275,10 @@ struct PostComposerView: View {
                     }
                 }
             } header: {
-                Text("Media")
+                Text("Media").fwbOnCanvas()
             } footer: {
                 Text("Up to \(PostMediaLimits.maxPhotos) photos, or one video under \(Int(PostMediaLimits.maxVideoSeconds)) seconds. Not both.")
+                    .fwbOnCanvas()
             }
         }
     }

@@ -30,72 +30,83 @@ struct BlockedMembersView: View {
 
     var body: some View {
         List {
-            if let loadError {
-                Section {
-                    // A failure with nothing on screen gets the whole surface; a
-                    // failure over a list that already loaded gets one line, because
-                    // replacing content the member can still read is a worse trade.
-                    if members.isEmpty {
-                        ErrorStateView(error: loadError) { Task { await load() } }
-                            .listRowBackground(Color.clear)
-                    } else {
-                        InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } }
-                    }
-                }
-            }
-
-            // `loadError == nil` is the whole point: "Nobody blocked" is a claim
-            // about the server's answer, and a failed request is not an answer.
-            if members.isEmpty && !isLoading && loadError == nil {
-                Section {
-                    EmptyStateView(
-                        icon: "hand.raised",
-                        title: "Nobody blocked",
-                        message: "Block someone from their profile and they'll show up here.")
-                    .listRowBackground(Color.clear)
-                }
-            }
-
-            ForEach(members) { member in
-                HStack(spacing: Theme.Spacing.md) {
-                    HStack(spacing: Theme.Spacing.md) {
-                        AvatarView(name: member.name, url: nil, size: 36)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(member.name)
-                                .font(Theme.Typography.rowTitle)
-                            if let username = member.username {
-                                Text("@\(username)")
-                                    .font(Theme.Typography.micro)
-                                    .foregroundStyle(.secondary)
-                            }
+            Group {
+                if let loadError {
+                    Section {
+                        // A failure with nothing on screen gets the whole surface; a
+                        // failure over a list that already loaded gets one line, because
+                        // replacing content the member can still read is a worse trade.
+                        if members.isEmpty {
+                            ErrorStateView(error: loadError) { Task { await load() } }
+                                // A clear row sits on the canvas, not in a box.
+                                .fwbOnCanvas()
+                                .listRowBackground(Color.clear)
+                        } else {
+                            InlineErrorRow(message: loadError.fwbMessage) { Task { await load() } }
                         }
                     }
-                    // One element, and `.ignore` rather than `.combine` because the
-                    // avatar's initials are a `Text` too — combining would have
-                    // VoiceOver read "BN, Bea Nolan, @bea" for every row.
-                    .accessibilityElement(children: .ignore)
-                    .accessibilityLabel(member.username.map { "\(member.name), @\($0)" } ?? member.name)
+                }
 
-                    Spacer()
-                    Button("Unblock") { pendingUnblock = member }
-                        .font(Theme.Typography.caption)
-                        .buttonStyle(.bordered)
-                        // Every row's button announced the bare word "Unblock", so a
-                        // list of blocked members offered a VoiceOver user several
-                        // identical controls and no way to tell whose block they were
-                        // about to lift.
-                        .accessibilityLabel("Unblock \(member.name)")
+                // `loadError == nil` is the whole point: "Nobody blocked" is a claim
+                // about the server's answer, and a failed request is not an answer.
+                if members.isEmpty && !isLoading && loadError == nil {
+                    Section {
+                        EmptyStateView(
+                            icon: "hand.raised",
+                            title: "Nobody blocked",
+                            message: "Block someone from their profile and they'll show up here.")
+                        .fwbOnCanvas()
+                        .listRowBackground(Color.clear)
+                    }
+                }
+
+                ForEach(members) { member in
+                    HStack(spacing: Theme.Spacing.md) {
+                        HStack(spacing: Theme.Spacing.md) {
+                            AvatarView(name: member.name, url: nil, size: 36)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(member.name)
+                                    .font(Theme.Typography.rowTitle)
+                                if let username = member.username {
+                                    Text("@\(username)")
+                                        .font(Theme.Typography.micro)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        // One element, and `.ignore` rather than `.combine` because the
+                        // avatar's initials are a `Text` too — combining would have
+                        // VoiceOver read "BN, Bea Nolan, @bea" for every row.
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(member.username.map { "\(member.name), @\($0)" } ?? member.name)
+
+                        Spacer()
+                        Button("Unblock") { pendingUnblock = member }
+                            .font(Theme.Typography.caption)
+                            .buttonStyle(.bordered)
+                            // Every row's button announced the bare word "Unblock", so a
+                            // list of blocked members offered a VoiceOver user several
+                            // identical controls and no way to tell whose block they were
+                            // about to lift.
+                            .accessibilityLabel("Unblock \(member.name)")
+                    }
+                }
+
+                if isLoading {
+                    Section {
+                        HStack { Spacer(); ProgressView(); Spacer() }
+                    }
                 }
             }
-
-            if isLoading {
-                Section {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                }
-            }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         .navigationTitle("Blocked")
         .navigationBarTitleDisplayMode(.inline)
+        // A pushed destination is a sibling in its stack, not a child of the root
+        // the stack's surface was applied to, so it carries its own — inside
+        // whichever stack hosts it. See `fwbAppThemeSurface()`.
+        .fwbAppThemeSurface()
         .task { await load() }
         .refreshable { await load() }
         .confirmationDialog(
