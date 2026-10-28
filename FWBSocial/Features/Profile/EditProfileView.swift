@@ -87,14 +87,20 @@ struct EditProfileView: View {
     var body: some View {
         NavigationStack {
             Form {
-                photoSection
-                nameSection
-                usernameSection
-                bioSection
+                Group {
+                    photoSection
+                    nameSection
+                    usernameSection
+                    bioSection
 
-                if let errorMessage {
-                    Section { FormErrorText(message: errorMessage) }
+                    if let errorMessage {
+                        Section { FormErrorText(message: errorMessage) }
+                    }
                 }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                // Without it the rows kept the system's dark grey under light
+                // Clubhouse while the headers above them were already on-canvas.
+                .fwbThemedRows()
             }
             // Background layer, never a gesture on the Form itself.
             .fwbDismissKeyboardOnTap()
@@ -283,10 +289,12 @@ struct EditProfileView: View {
         if remaining < 0 {
             Text("\(-remaining) over the \(maxBio)-character limit")
                 .foregroundStyle(Theme.Colors.danger)
+                .fwbOnCanvas()
                 .accessibilityIdentifier("editProfile.bioCount")
         } else if remaining <= bioWarningThreshold {
             Text("\(remaining) character\(remaining == 1 ? "" : "s") left")
                 .foregroundStyle(Theme.Colors.caution)
+                .fwbOnCanvas()
                 .accessibilityIdentifier("editProfile.bioCount")
         } else {
             Text("Up to \(maxBio) characters.").fwbOnCanvas()
