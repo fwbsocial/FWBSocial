@@ -268,6 +268,9 @@ final class FWBAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationC
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         UNUserNotificationCenter.current().delegate = self
+        // Clears decrypted chat text that earlier NSE builds donated to the system
+        // Interactions store. Runs once per install; see `LegacyInteractionPurge`.
+        LegacyInteractionPurge.runOnce()
         return true
     }
 
