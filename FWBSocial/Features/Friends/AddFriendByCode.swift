@@ -149,13 +149,17 @@ struct AddFriendSheet: View {
 
     var body: some View {
         Form {
-            AddFriendByCodeSection(onSent: onSent)
+            Group {
+                AddFriendByCodeSection(onSent: onSent)
 
-            Section {
-                Text("You can also add the people you actually met: for 48 hours after an event, everyone who checked in shows up on its roster.")
-                    .font(Theme.Typography.preview)
-                    .foregroundStyle(.secondary)
+                Section {
+                    Text("You can also add the people you actually met: for 48 hours after an event, everyone who checked in shows up on its roster.")
+                        .font(Theme.Typography.preview)
+                        .foregroundStyle(.secondary)
+                }
             }
+            // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+            .fwbThemedRows()
         }
         // Background layer, never a tap gesture on the Form itself — a gesture on
         // the Form eats every row's own tap (house gotcha).

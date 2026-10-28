@@ -312,28 +312,34 @@ struct UnpinDateSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    DatePicker(
-                        "Unpin on",
-                        selection: $date,
-                        in: range,
-                        displayedComponents: [.date, .hourAndMinute])
-                    .datePickerStyle(.compact)
-                    .accessibilityIdentifier("announcement.unpinDate")
-                } footer: {
-                    Text("“\(announcement.displayTitle)” stays at the top of the feed until then, and drops back into the timeline on its own. Nobody is notified.")
-                }
-
-                if announcement.pinnedUntil != nil {
+                Group {
                     Section {
-                        Button("Remove unpin date", role: .destructive) {
-                            onSchedule(nil)
-                            dismiss()
-                        }
+                        DatePicker(
+                            "Unpin on",
+                            selection: $date,
+                            in: range,
+                            displayedComponents: [.date, .hourAndMinute])
+                        .datePickerStyle(.compact)
+                        .accessibilityIdentifier("announcement.unpinDate")
                     } footer: {
-                        Text("Keeps it pinned until you unpin it by hand.")
+                        Text("“\(announcement.displayTitle)” stays at the top of the feed until then, and drops back into the timeline on its own. Nobody is notified.")
+                            .fwbOnCanvas()
+                    }
+
+                    if announcement.pinnedUntil != nil {
+                        Section {
+                            Button("Remove unpin date", role: .destructive) {
+                                onSchedule(nil)
+                                dismiss()
+                            }
+                        } footer: {
+                            Text("Keeps it pinned until you unpin it by hand.")
+                                .fwbOnCanvas()
+                        }
                     }
                 }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                .fwbThemedRows()
             }
             .navigationTitle("Unpin on a date")
             .navigationBarTitleDisplayMode(.inline)

@@ -56,7 +56,7 @@ struct ChannelFeedView: View {
                     Section {
                         ForEach(pinnedPosts) { post in row(post) }
                     } header: {
-                        Label("Pinned", systemImage: "pin.fill")
+                        Label("Pinned", systemImage: "pin.fill").fwbOnCanvas()
                     }
                 }
 
@@ -82,6 +82,8 @@ struct ChannelFeedView: View {
                             // member to write a post into a channel the app cannot
                             // currently read — and the composer would fail too.
                             ErrorStateView(error: failure) { Task { await reload() } }
+                                // A clear row sits on the canvas, not in a box.
+                                .fwbOnCanvas()
                                 .listRowBackground(Color.clear)
                         } else {
                             EmptyStateView(
@@ -92,6 +94,7 @@ struct ChannelFeedView: View {
                                     : "Posts in this channel will show up here.",
                                 actionTitle: current.mayPost ? "New post" : nil,
                                 action: current.mayPost ? { isComposing = true } : nil)
+                            .fwbOnCanvas()
                             .listRowBackground(Color.clear)
                         }
                     }

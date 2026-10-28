@@ -55,58 +55,63 @@ struct ChannelCreateView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    TextField("Name", text: $name)
-                        .focused($isNameFocused)
-                        .submitLabel(.done)
-                        .accessibilityIdentifier("channelCreate.name")
-                        .accessibilityLabel("Channel name")
-                } header: {
-                    Text("Name")
-                } footer: {
-                    nameFooter
-                }
-
-                Section {
-                    TextField("What's it for?", text: $summary, axis: .vertical)
-                        .lineLimit(2...4)
-                        .accessibilityIdentifier("channelCreate.description")
-                        .accessibilityLabel("Channel description")
-                } header: {
-                    Text("Description")
-                } footer: {
-                    Text("Optional. It shows under the name in the channel list.")
-                }
-
-                Section {
-                    Picker("Who can see it", selection: $visibility) {
-                        ForEach(ChannelVisibilityOption.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
+                Group {
+                    Section {
+                        TextField("Name", text: $name)
+                            .focused($isNameFocused)
+                            .submitLabel(.done)
+                            .accessibilityIdentifier("channelCreate.name")
+                            .accessibilityLabel("Channel name")
+                    } header: {
+                        Text("Name").fwbOnCanvas()
+                    } footer: {
+                        nameFooter.fwbOnCanvas()
                     }
-                    .accessibilityIdentifier("channelCreate.visibility")
-                } header: {
-                    Text("Visibility")
-                } footer: {
-                    Text(visibility.explanation)
-                }
 
-                Section {
-                    Picker("Members can", selection: $defaultRole) {
-                        ForEach(ChannelDefaultRoleOption.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
+                    Section {
+                        TextField("What's it for?", text: $summary, axis: .vertical)
+                            .lineLimit(2...4)
+                            .accessibilityIdentifier("channelCreate.description")
+                            .accessibilityLabel("Channel description")
+                    } header: {
+                        Text("Description").fwbOnCanvas()
+                    } footer: {
+                        Text("Optional. It shows under the name in the channel list.")
+                            .fwbOnCanvas()
                     }
-                    .accessibilityIdentifier("channelCreate.defaultRole")
-                } header: {
-                    Text("Default role")
-                } footer: {
-                    Text(defaultRole.explanation)
-                }
 
-                if let error {
-                    Section { FormErrorText(message: error) }
+                    Section {
+                        Picker("Who can see it", selection: $visibility) {
+                            ForEach(ChannelVisibilityOption.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
+                        }
+                        .accessibilityIdentifier("channelCreate.visibility")
+                    } header: {
+                        Text("Visibility").fwbOnCanvas()
+                    } footer: {
+                        Text(visibility.explanation).fwbOnCanvas()
+                    }
+
+                    Section {
+                        Picker("Members can", selection: $defaultRole) {
+                            ForEach(ChannelDefaultRoleOption.allCases) { option in
+                                Text(option.title).tag(option)
+                            }
+                        }
+                        .accessibilityIdentifier("channelCreate.defaultRole")
+                    } header: {
+                        Text("Default role").fwbOnCanvas()
+                    } footer: {
+                        Text(defaultRole.explanation).fwbOnCanvas()
+                    }
+
+                    if let error {
+                        Section { FormErrorText(message: error) }
+                    }
                 }
+                // Row backgrounds are a per-row trait — see `fwbThemedRows()`.
+                .fwbThemedRows()
             }
             // Background layer, never a gesture on the Form itself.
             .fwbDismissKeyboardOnTap()
