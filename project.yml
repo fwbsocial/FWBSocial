@@ -151,6 +151,10 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: FWBSocialTests
+      # Compiled into the tests too so the notification intent's privacy contract
+      # (sender only, no message text) can be asserted without a device. It has no
+      # dependency on the app or `AppGroupStore`.
+      - path: FWBSocialNotificationService/CommunicationIntentBuilder.swift
     dependencies:
       - target: FWBSocial
     settings:

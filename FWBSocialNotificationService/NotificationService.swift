@@ -20,8 +20,9 @@ import UserNotifications
 //   push `message_id` → GET /api/chat/messages/:id?device=<this device> (Bearer)
 //   → X-Wing-unwrap this device's copy of the per-message key
 //   → AES-GCM-open the sealed body
-//   → build an `INSendMessageIntent` so the banner renders as a native
-//     communication notification: sender name and avatar, app icon demoted.
+//   → build a sender-only `INSendMessageIntent` (no message text, never donated)
+//     so the banner renders as a native communication notification: sender name
+//     and avatar, app icon demoted.
 //
 // Names and avatars come from the App Group, resolved on-device. **Nothing
 // identifying ever travels through APNs.**
@@ -243,6 +244,10 @@ final class NotificationService: UNNotificationServiceExtension {
         return content
     }
 
+    /// Styles the banner as a communication notification. The intent carries the
+    /// sender only — never the message text — and is deliberately NOT donated: a
+    /// donation would write the decrypted body into the system Interactions store,
+    /// which the app can never purge. See `CommunicationIntentBuilder`.
     private static func communicationContent(
         base content: UNMutableNotificationContent,
         senderId: String?,
@@ -251,40 +256,13 @@ final class NotificationService: UNNotificationServiceExtension {
         body: String
     ) -> UNNotificationContent? {
         content.body = body
-
-        let handle = INPersonHandle(value: senderId ?? senderName, type: .unknown)
-        let sender = INPerson(
-            personHandle: handle,
-            nameComponents: nil,
-            displayName: senderName,
-            image: senderId.flatMap(Self.cachedAvatar(forSenderId:)),
-            contactIdentifier: nil,
-            customIdentifier: senderId
+        return CommunicationIntentBuilder.upgrade(
+            content,
+            senderId: senderId,
+            senderName: senderName,
+            conversationTitle: conversationTitle,
+            avatar: senderId.flatMap(Self.cachedAvatar(forSenderId:))
         )
-
-        // A group carries a speakable name so the banner reads "Sender, Group"; a 1:1
-        // omits it — the conversation title there IS the sender's name, and repeating
-        // it reads as a bug.
-        let speakableGroup = (conversationTitle != senderName)
-            ? conversationTitle.map { INSpeakableString(spokenPhrase: $0) }
-            : nil
-
-        let intent = INSendMessageIntent(
-            recipients: nil,
-            outgoingMessageType: .outgoingMessageText,
-            content: body,
-            speakableGroupName: speakableGroup,
-            conversationIdentifier: nil,
-            serviceName: nil,
-            sender: sender,
-            attachments: nil
-        )
-
-        let interaction = INInteraction(intent: intent, response: nil)
-        interaction.direction = .incoming
-        interaction.donate(completion: nil)
-
-        return try? content.updating(from: intent)
     }
 
     private static func cachedAvatar(forSenderId id: String) -> INImage? {
