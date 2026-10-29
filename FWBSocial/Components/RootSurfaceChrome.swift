@@ -114,8 +114,9 @@ extension View {
 extension View {
     /// Registers the surface's single contextual action into the tab bar's
     /// trailing slot — owner directive 2026-08-11: the four tabs stay grouped
-    /// left; the trailing slot always holds its space (so tab geometry never
-    /// shifts) and carries whatever the current surface needs.
+    /// left; the trailing slot, separated, carries whatever the current surface
+    /// needs and is hidden (four tabs across the full bar) while nothing is
+    /// registered — see `RootTabView`.
     ///
     /// **Owner directive 2026-08-11 (second pass): every page registers.** The
     /// slot is never left empty on a page a member can act on — Feed shares a
@@ -135,8 +136,8 @@ extension View {
     /// what stops a captured handler going stale against the state it reads.
     ///
     /// - Parameters:
-    ///   - label: **One word.** The slot keeps `role: .search` (owner final
-    ///     decision 2026-08-11) and a search-role tab is icon-only, so this is
+    ///   - label: **One word.** The slot keeps a separated tab role (owner final
+    ///     decision 2026-08-11) and a separated-role tab is icon-only, so this is
     ///     not drawn today — the glyph and the page carry the meaning on screen.
     ///     It stays short and accurate as the name of the action and as the
     ///     fallback when no `voiceOverLabel` is given.

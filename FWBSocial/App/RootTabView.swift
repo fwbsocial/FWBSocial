@@ -68,14 +68,12 @@ struct RootTabView: View {
                 }
             }
 
-            // The fifth slot (owner directives 2026-08-11): four tabs grouped
-            // left, one contextual action on the right. The slot is ALWAYS
-            // present so the four main tabs keep identical spacing on every
-            // page — when the surface has no action, the slot renders an empty
-            // glyph and selecting it does nothing (see the intercept below).
+            // The trailing slot (owner directives 2026-08-11, revised 2026-10-28): four
+            // tabs grouped left, one contextual action separated on the right.
             //
-            // `role: .search` gives it the system's separated trailing
-            // treatment; it never presents content of its own.
+            // The role is what separates it — see `composeTabRole`. It never
+            // presents content of its own; selecting it fires the registered action
+            // (see the intercept below).
             //
             // **Owner final decision 2026-08-11: separated wins.** The role was
             // briefly dropped to get a word under the glyph the way the four real
@@ -84,10 +82,21 @@ struct RootTabView: View {
             // separation was judged the more valuable of the two.
             //
             // The consequence to keep in mind when registering: **the label is not
-            // drawn.** A `.search`-role tab is icon-only by system design, so the
+            // drawn.** A separated-role tab is icon-only by system design, so the
             // glyph carries the whole meaning on screen and `voiceOverLabel` — the
             // full phrase, not the condensed word — carries it for everyone else.
-            Tab(value: FWBTab.compose, role: .search) {
+            //
+            // **Hidden while nothing is registered (owner direction 2026-10-28).**
+            // The slot used to be ALWAYS present, holding its space as an empty
+            // glyph so the four tabs never shifted. Under the iOS 27 separated role
+            // that would be an empty circle, and for the members who have no action
+            // at all — a signed-out visitor, a not-yet-vetted member — it is a
+            // button that does nothing. `.hidden` takes it out of the bar without
+            // changing the tab structure, so those members get the four tabs
+            // across the full width. Every other page registers (see
+            // `floatingAction`), so for a signed-in, vetted member the slot is
+            // there on every page; who sees it, and what it opens, are unchanged.
+            Tab(value: FWBTab.compose, role: composeTabRole) {
                 Color.clear // never shown — selection is intercepted
             } label: {
                 if let contextual = appState.contextualAction {
@@ -101,6 +110,7 @@ struct RootTabView: View {
                         .accessibilityHidden(true)
                 }
             }
+            .hidden(appState.contextualAction == nil)
 
         }
         .tint(Theme.Colors.brand)
@@ -142,6 +152,26 @@ struct RootTabView: View {
             guard previous != nil, previous != current else { return }
             AppPrefetch.vettingDidChange()
         }
+    }
+
+    /// The role that puts the compose slot in its own trailing circle — one spelling
+    /// per OS generation, because iOS 27 moved the separation off `.search`.
+    ///
+    /// Through iOS 26, `role: .search` was the only way to separate a tab, and this
+    /// slot borrowed it for placement alone. iOS 27 splits that one behavior into
+    /// two roles: `.prominent` now OWNS the separated trailing slot, and `.search`
+    /// reverts to meaning an actual search tab — it only gets the separated
+    /// treatment when it is a search tab that could activate search, which a
+    /// compose action is not. So an SDK-27 build with `.search` rendered the slot as
+    /// an ordinary fifth tab inside the bar (Bobak's iPhone 17 Pro, iOS 27.0.1,
+    /// 2026-10-28), while the iOS 26 build still separated it. Same finding and same
+    /// fix as Sentinel's `settingsTabRole` (51964ef) and AlertEd's (Happen 769f147).
+    ///
+    /// iOS 26 keeps `.search` exactly as shipped: `.prominent` does not exist there,
+    /// and `.search` still separates. Neither role gives the slot any search
+    /// affordance — it is not `.searchable`, and the selection never lands on it.
+    private var composeTabRole: TabRole {
+        if #available(iOS 27.0, *) { .prominent } else { .search }
     }
 
     /// The tab selection, with the compose slot intercepted **before** it is ever
