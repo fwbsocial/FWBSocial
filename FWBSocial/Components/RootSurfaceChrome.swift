@@ -114,9 +114,8 @@ extension View {
 extension View {
     /// Registers the surface's single contextual action into the tab bar's
     /// trailing slot — owner directive 2026-08-11: the four tabs stay grouped
-    /// left; the trailing slot, separated, carries whatever the current surface
-    /// needs and is hidden (four tabs across the full bar) while nothing is
-    /// registered — see `RootTabView`.
+    /// left; the trailing slot, separated, always holds its space (so tab geometry
+    /// never shifts) and carries whatever the current surface needs.
     ///
     /// **Owner directive 2026-08-11 (second pass): every page registers.** The
     /// slot is never left empty on a page a member can act on — Feed shares a

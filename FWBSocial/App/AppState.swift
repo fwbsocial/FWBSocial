@@ -114,8 +114,7 @@ final class AppState {
 
     /// The contextual trailing tab-bar action (owner directive 2026-08-11).
     /// Surfaces register on appear and clear on disappear via
-    /// `.floatingAction(...)`; nil = the slot is hidden and the four tabs span the bar
-    /// (see `RootTabView`).
+    /// `.floatingAction(...)`; nil = the slot holds its space and draws nothing.
     ///
     /// **`owner` is what makes stacking safe.** Once every page registers — a
     /// channel feed pushed over the channel list, a thread pushed over that —

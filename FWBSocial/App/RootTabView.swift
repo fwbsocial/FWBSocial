@@ -86,16 +86,13 @@ struct RootTabView: View {
             // glyph carries the whole meaning on screen and `voiceOverLabel` — the
             // full phrase, not the condensed word — carries it for everyone else.
             //
-            // **Hidden while nothing is registered (owner direction 2026-10-28).**
-            // The slot used to be ALWAYS present, holding its space as an empty
-            // glyph so the four tabs never shifted. Under the iOS 27 separated role
-            // that would be an empty circle, and for the members who have no action
-            // at all — a signed-out visitor, a not-yet-vetted member — it is a
-            // button that does nothing. `.hidden` takes it out of the bar without
-            // changing the tab structure, so those members get the four tabs
-            // across the full width. Every other page registers (see
-            // `floatingAction`), so for a signed-in, vetted member the slot is
-            // there on every page; who sees it, and what it opens, are unchanged.
+            // **The slot is ALWAYS present (owner directive 2026-08-11, reaffirmed
+            // 2026-10-28).** When the surface registered nothing it holds its space
+            // as an empty glyph and selecting it does nothing, so the bar never
+            // changes width and the four tabs never shift between pages. Do not
+            // hide it while nothing is registered: that was tried on 2026-10-28
+            // (dd24f5c) and reverted, because the bar then switches between four
+            // and five tabs.
             Tab(value: FWBTab.compose, role: composeTabRole) {
                 Color.clear // never shown — selection is intercepted
             } label: {
@@ -110,7 +107,6 @@ struct RootTabView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .hidden(appState.contextualAction == nil)
 
         }
         .tint(Theme.Colors.brand)
