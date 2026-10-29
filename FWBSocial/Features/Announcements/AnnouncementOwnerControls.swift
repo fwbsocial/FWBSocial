@@ -328,9 +328,16 @@ struct UnpinDateSheet: View {
 
                     if announcement.pinnedUntil != nil {
                         Section {
-                            Button("Remove unpin date", role: .destructive) {
+                            // Centred (owner, 2026-10-28) — it is the only action in its
+                            // section, so it reads as a button rather than a row. The
+                            // full-width frame is on the LABEL, which keeps the whole row
+                            // the tap target; the role still supplies the red.
+                            Button(role: .destructive) {
                                 onSchedule(nil)
                                 dismiss()
+                            } label: {
+                                Text("Remove unpin date")
+                                    .frame(maxWidth: .infinity)
                             }
                         } footer: {
                             Text("Keeps it pinned until you unpin it by hand.")
