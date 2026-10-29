@@ -294,6 +294,10 @@ enum AppTheme: String, CaseIterable, Identifiable {
 // exactly as dark mode always did. Light's alphas are lower only because it is
 // starting from a brighter plate.
 private struct ClubhouseBackdrop: View {
+    /// An opaque stand-in for the painting's overall level, for the one place that
+    /// needs an OPAQUE colour behind it and never shows it — see `AppThemeSheetBase`.
+    static let sheetBase = Color(red: 0.07, green: 0.13, blue: 0.12)
+
     @Environment(\.colorScheme) private var colorScheme
 
     private var isDark: Bool { colorScheme == .dark }
@@ -481,6 +485,57 @@ private struct AppThemeSurface: ViewModifier {
                     .environment(\.colorScheme, windowScheme)
                     .ignoresSafeArea()
             }
+            // See `AppThemeSheetBase`. A second `.background` so the backdrop's own
+            // layout is untouched.
+            .background { AppThemeSheetBase(inverts: inverts) }
+    }
+}
+
+/// Gives a Clubhouse sheet an OPAQUE presentation background, so the system does
+/// not render its contents as vibrancy over glass.
+///
+/// **The bug this exists for (owner, 2026-10-28, iPhone 17 Pro, iOS 27.0.1):** in
+/// light Clubhouse the destructive button on the white row — "Remove unpin date"
+/// in `UnpinDateSheet` — came up PINK instead of red.
+///
+/// Measured on an iOS 27.0 simulator, not guessed. Clubhouse pins the WINDOW to
+/// dark (`AppearanceService.windowStyle`), and a sheet presented at a PARTIAL
+/// detent (`.presentationDetents([.medium, .large])` — `UnpinDateSheet`'s own) sits
+/// on iOS 26/27's translucent glass, which renders the sheet's content as dark-mode
+/// vibrancy. That treatment leaves black and the app's own colours alone but
+/// washes out every SYSTEM colour — `Color.red`, `Color.green`, `Color.orange`,
+/// and the role colour a `.destructive` button derives — to roughly a quarter of
+/// its strength, which is a light pink on a white row. It is only a partial
+/// detent: at `.large` the same sheet is opaque and the same button is correct,
+/// and Standard is correct at every detent because its glass is light.
+///
+/// What did NOT cure it, each tried on the same sheet: an explicit
+/// `.foregroundStyle(Theme.Colors.danger)` (still the system red, still washed),
+/// `.tint`, `.compositingGroup()`, `.presentationBackground(.clear)`, and an
+/// `\.colorScheme` override. What did: a concrete (non-system) colour, `.drawingGroup()`
+/// on the label, and an OPAQUE `.presentationBackground`. Only the last is
+/// theme-level — it fixes the role colour, the status colours and anything a screen
+/// adds later without each of them having to know — so that is the one here.
+///
+/// It costs nothing visible. Every Clubhouse screen already paints the same
+/// painting over its whole frame, so this colour sits behind it and is never seen;
+/// it only has to be opaque.
+///
+/// `.presentationBackground` is a PREFERENCE, so it reaches the presenting sheet
+/// from a `.background` child exactly as it would from the screen itself, and it
+/// is harmless on a surface that is not in a sheet. It sits in its own tiny view
+/// because the choice is conditional and an `if/else` around the SCREEN would split
+/// its identity (see `AppThemeContainer`); here the branch only swaps an empty
+/// colour. Standard and Pine are left to the system's own sheet background.
+private struct AppThemeSheetBase: View {
+    let inverts: Bool
+
+    var body: some View {
+        if inverts {
+            Color.clear.presentationBackground(ClubhouseBackdrop.sheetBase)
+        } else {
+            Color.clear
+        }
     }
 }
 
